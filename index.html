@@ -290,6 +290,7 @@
         <div class="gmeta">เฉพาะแอดมิน — ลบ / แก้ไขตัวละครได้จากที่เดียว</div>
       </div>
       <button class="toolbtn g" onclick="impOpen()">📷 นำเข้าจากรูป</button>
+      <button class="toolbtn" onclick="logOpen()">🕘 ประวัติ</button>
       <button class="toolbtn" onclick="closeManage()">↩ กลับหน้าเลือกกิลด์</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:11px;flex-wrap:wrap;align-items:center">
@@ -328,6 +329,17 @@
       </div>
     </div>
   </div>
+  <div id="logOv" class="hidden" onclick="if(event.target===this)logClose()" style="position:fixed;inset:0;background:rgba(5,7,16,.78);z-index:74;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div class="card" style="width:100%;max-width:580px;max-height:90vh;overflow:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <h3 style="margin:0;flex:1">🕘 ประวัติการแก้ไข</h3>
+        <button class="rclose" style="margin-left:0" onclick="logClose()">✕</button>
+      </div>
+      <p class="csub">บันทึกอัตโนมัติทุกการ เพิ่ม / แก้ไข / ลบ / ย้ายกิลด์ (แสดง 120 รายการล่าสุด — การจัดปาตี้ไม่ถูกบันทึก)</p>
+      <div id="logList"></div>
+    </div>
+  </div>
+
   <div id="impOv" class="hidden" onclick="if(event.target===this)impClose()" style="position:fixed;inset:0;background:rgba(5,7,16,.78);z-index:74;display:flex;align-items:center;justify-content:center;padding:16px">
     <div class="card" style="width:100%;max-width:640px;max-height:92vh;overflow:auto">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
@@ -1112,7 +1124,8 @@ const sb = SB_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_K
 
 function chk_(r){ if(r.error) throw new Error(r.error.message); return r.data; }
 function rowOut_(r){ return {guild:r.guild, ign:r.ign, cls:r.cls, cp:Number(r.cp)||0,
-  isLeader:!!r.is_leader, leader:r.leader||"", party:(r.party==null?-1:r.party), slot:(r.slot==null?-1:r.slot)}; }
+  isLeader:!!r.is_leader, leader:r.leader||"", party:(r.party==null?-1:r.party), slot:(r.slot==null?-1:r.slot),
+  upd:r.updated_at||null}; }
 async function fetchAll_(){ return chk_(await sb.from("members").select("*").order("ign")).map(rowOut_); }
 
 const API = {
@@ -1184,6 +1197,10 @@ const API = {
       chk_(await sb.from("board_mode").upsert({guild:guild,mode:String(mode||"")}).select());
       return {ok:true};
     }catch(e){ return {ok:false, err:String(e.message||e)}; }
+  },
+
+  getLog: async function(){
+    return chk_(await sb.from("member_log").select("*").order("at",{ascending:false}).limit(120));
   },
 
   announceBoard: async function(guild, text){
@@ -1309,31 +1326,83 @@ function renderManage(){
     dupBox.classList.remove("hidden");
   } else dupBox.classList.add("hidden");
   var q=(document.getElementById("mgSearch").value||"").trim().toLowerCase();
-  var total=0;
+  var total=0,cut=staleCut_(),staleTotal=0;
+  var isStale=function(m){return !!(m.upd&&new Date(m.upd)<cut);};
   GUILDS.forEach(function(g){
-    var arr=mgAll.filter(function(m){return m.guild===g.key&&(!q||m.ign.toLowerCase().includes(q)||m.cls.toLowerCase().includes(q));}).sort(mgCmp);
+    var arr=mgAll.filter(function(m){return m.guild===g.key&&(!q||m.ign.toLowerCase().includes(q)||m.cls.toLowerCase().includes(q));});
     total+=arr.length;
+    var staleN=arr.filter(isStale).length;staleTotal+=staleN;
     var col=document.createElement("div");col.className="mgcol";col.style.setProperty("--gc",g.color);
     var h=document.createElement("div");h.className="mgcolhead";
-    h.innerHTML='<span class="dot2" style="background:'+g.color+'"></span><b style="color:'+g.color+'">'+g.key+'</b><span class="gmeta" style="margin-left:auto">'+arr.length+' คน</span>';
+    h.innerHTML='<span class="dot2" style="background:'+g.color+'"></span><b style="color:'+g.color+'">'+g.key+'</b>'+
+      '<span class="gmeta" style="margin-left:auto">'+arr.length+' คน'+(staleN?' • <b style="color:#ff9c9c">⏰ '+staleN+' ไม่ขยับ</b>':'')+'</span>';
     col.appendChild(h);
+    // สรุปอาชีพของกิลด์นี้
+    var cc={};arr.forEach(function(m){var k=m.cls||"";cc[k]=(cc[k]||0)+1;});
+    var cs=document.createElement("div");cs.style.cssText="display:flex;flex-wrap:wrap;gap:4px;margin:0 0 9px";
+    var csh="";
+    CLASSES.forEach(function(c){if(cc[c.n])csh+='<span class="badge" style="background:'+c.c+'22;color:'+c.c+'">'+c.n+' '+cc[c.n]+'</span>';});
+    if(cc[""])csh+='<span class="badge" style="background:#88888822;color:#aaa">ยังไม่ระบุอาชีพ '+cc[""]+'</span>';
+    cs.innerHTML=csh;
+    if(csh)col.appendChild(cs);
     if(!arr.length){var e=document.createElement("div");e.className="poolempty";e.textContent="— ไม่มีรายชื่อ —";col.appendChild(e);}
-    arr.forEach(function(m){
+    var mkRow=function(m){
       var el=document.createElement("div");el.className="mgrow"+(dupSet[m.guild+"|"+m.ign]?" dup":"");
       el.innerHTML='<span class="badge" style="background:'+classColor(m.cls)+'22;color:'+classColor(m.cls)+'">'+m.cls+'</span>'+
         '<span class="nm">'+(m.isLeader?"👑 ":"")+m.ign+'</span>'+
+        (m.party>=0?'<span class="pbadge">ตี้ '+(m.party+1)+'</span>':'')+
+        (isStale(m)?'<span class="pbadge" style="background:#3a1c1c;border-color:#6b2f2f;color:#ff9c9c">⏰ ไม่ขยับ</span>':'')+
         '<span class="meta"><b>'+(m.cp/1000).toFixed(0)+'k</b></span>'+
         '<span style="margin-left:auto;display:flex;gap:5px;flex:none">'+
         '<button class="mgbtn" data-a="e" title="แก้ไข">✎</button>'+
         '<button class="mgbtn del" data-a="d" title="ลบ">🗑</button></span>';
       el.querySelector('[data-a="e"]').onclick=function(){mgEditOpen(m);};
       el.querySelector('[data-a="d"]').onclick=function(){mgDelete(m);};
-      col.appendChild(el);
+      return el;
+    };
+    // จัดกลุ่มก๊วน: หัวก๊วน + ลูกก๊วนเกาะกันเสมอ
+    var byLead={},solo=[];
+    arr.forEach(function(m){
+      var k=m.isLeader?m.ign.toLowerCase():(m.leader?String(m.leader).toLowerCase():null);
+      if(k===null)solo.push(m);else (byLead[k]=byLead[k]||[]).push(m);
     });
+    var groups=Object.keys(byLead).map(function(k){
+      var a2=byLead[k];
+      a2.sort(function(x,y){return (y.isLeader?1:0)-(x.isLeader?1:0)||mgCmp(x,y);});
+      return {k:k,arr:a2,head:a2[0]};
+    });
+    groups.sort(function(x,y){return mgCmp(x.head,y.head);});
+    solo.sort(mgCmp);
+    groups.forEach(function(gr){
+      var gc2=mgGroupColor(gr.k);
+      var tot=gr.arr.reduce(function(s,m){return s+(Number(m.cp)||0);},0);
+      var lname=gr.head.isLeader?gr.head.ign:(gr.arr[0].leader||gr.k);
+      var card=document.createElement("div");card.className="grpcard";card.style.borderLeftColor=gc2;
+      var h2=document.createElement("div");h2.className="grphead";
+      h2.innerHTML='<span class="crown">👑</span><span class="lead" style="color:'+gc2+'">'+lname+'</span>'+
+        '<span class="gc">'+gr.arr.length+' คน • '+(tot/1000).toFixed(0)+'k</span>';
+      card.appendChild(h2);
+      gr.arr.forEach(function(m){card.appendChild(mkRow(m));});
+      col.appendChild(card);
+    });
+    if(solo.length){
+      if(groups.length){var sh=document.createElement("div");sh.className="subhead";sh.textContent="มาคนเดียว / ไม่มีก๊วน";col.appendChild(sh);}
+      solo.forEach(function(m){col.appendChild(mkRow(m));});
+    }
     list.appendChild(col);
   });
-  cnt.textContent=total+" ตัวละคร (ทุกกิลด์)";
+  cnt.textContent=total+" ตัวละคร (ทุกกิลด์)"+(staleTotal?" • ⏰ "+staleTotal+" คน CP ไม่ขยับตั้งแต่ก่อนวันอาทิตย์ล่าสุด (เดดไลน์จันทร์ 00:00)":"");
 }
+/* วันอาทิตย์ 00:00 ล่าสุดที่พ้นเดดไลน์ (จันทร์ 00:00) ไปแล้ว */
+function staleCut_(){
+  var n=new Date();
+  var d=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+  var back=(d.getDay()+6)%7;                 // ถอยไปวันจันทร์ล่าสุด
+  var mon=new Date(d);mon.setDate(d.getDate()-back);
+  var cut=new Date(mon);cut.setDate(mon.getDate()-1); // อาทิตย์ 00:00 ก่อนเดดไลน์
+  return cut;
+}
+function mgGroupColor(k){var h=0;for(var i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))%360;return "hsl("+h+" 60% 62%)";}
 function mgDelete(m){
   mgDelSel=m;
   document.getElementById("mgDelInfo").innerHTML='กำลังจะลบ <b>'+(m.isLeader?"👑 ":"")+m.ign+'</b><br>กิลด์ '+m.guild+' • '+m.cls+' • '+(m.cp/1000).toFixed(0)+'k'+(m.leader?'<br>อยู่ก๊วนของ '+m.leader:'')+'<br><br>ใช้ตอนคนออกจากกิลด์/ไล่ออก — ลบแล้วกู้คืนไม่ได้';
@@ -1490,6 +1559,31 @@ async function impSave(){
     loadCounts();
   }catch(e){busyBtn("impSave",false);toast("บันทึกไม่ได้: "+((e&&e.message)||e));}
 }
+
+/* ---------- ประวัติการแก้ไข ---------- */
+function logOpen(){
+  if(!IS_ADMIN)return;
+  document.getElementById("logOv").classList.remove("hidden");
+  var box=document.getElementById("logList");
+  box.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
+  srv("getLog").then(function(rows){
+    box.innerHTML="";
+    if(!rows||!rows.length){box.innerHTML='<div class="poolempty">— ยังไม่มีประวัติ —</div>';return;}
+    var AC={"เพิ่ม":["#14301f","#8fe0a8"],"แก้ไข":["#33290f","#ffd35c"],"ลบ":["#3a1c1c","#ff9c9c"],"ย้ายกิลด์":["#0f2c38","#4fd8ff"]};
+    rows.forEach(function(r){
+      var c=AC[r.action]||["#222","#aaa"];
+      var d=new Date(r.at);
+      var ts=("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+      var el=document.createElement("div");el.className="mgrow";
+      el.innerHTML='<span class="gmeta" style="flex:none;width:78px">'+ts+'</span>'+
+        '<span class="badge" style="flex:none;background:'+c[0]+';color:'+c[1]+'">'+r.action+'</span>'+
+        '<span class="nm" style="flex:none;max-width:130px">'+(r.ign||"")+'</span>'+
+        '<span class="gmeta" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+String(r.detail||"").replace(/"/g,"&quot;")+'">'+(r.detail||"")+(r.guild?" ["+r.guild+"]":"")+'</span>';
+      box.appendChild(el);
+    });
+  }).catch(function(e){box.innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
+}
+function logClose(){document.getElementById("logOv").classList.add("hidden");}
 
 /* init */
 renderPick();loadCounts();
