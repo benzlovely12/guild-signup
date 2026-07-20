@@ -262,7 +262,16 @@
   .mgrow .nm{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   .mgrow.dup{border-color:var(--danger);background:#2c1519}
   .mgbtn{padding:5px 9px}
-  @media(max-width:900px){.mgcols{grid-template-columns:1fr}}
+  .mgtabs{display:none}
+  @media(max-width:900px){
+    .mgcols{grid-template-columns:1fr}
+    .mgtabs{display:flex;gap:6px;margin-bottom:10px;position:sticky;top:6px;z-index:30}
+    .mgtab{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:8px 4px;font-weight:800;font-size:12.5px;line-height:1.35;cursor:pointer;text-align:center}
+    .mgtab small{display:block;font-weight:700;font-size:11px;opacity:.85}
+    .mgtab.on{background:var(--gt);color:#111!important;border-color:transparent}
+    .mgcols .mgcol{display:none}
+    .mgcols .mgcol.on{display:block}
+  }
 
   .simtag{display:inline-block;background:#332a14;color:var(--gold);border:1px solid #5a4a1e;border-radius:16px;padding:3px 10px;font-size:11.5px;font-weight:700;margin:2px 2px 0 0}
   .simtag.ex{background:#3a1c1c;color:#ff9c9c;border-color:#6b2f2f}
@@ -293,6 +302,7 @@
       <button class="toolbtn" onclick="logOpen()">🕘 ประวัติ</button>
       <button class="toolbtn" onclick="closeManage()">↩ กลับหน้าเลือกกิลด์</button>
     </div>
+    <div class="mgtabs" id="mgTabs"></div>
     <div style="display:flex;gap:8px;margin-bottom:11px;flex-wrap:wrap;align-items:center">
       <div class="search" style="flex:1;min-width:220px;margin:0"><input id="mgSearch" placeholder="ค้นหาชื่อ/อาชีพ..." oninput="renderManage()"></div>
       <div class="sorts" style="margin:0" id="mgSorts"></div>
@@ -336,6 +346,7 @@
         <button class="rclose" style="margin-left:0" onclick="logClose()">✕</button>
       </div>
       <p class="csub">บันทึกอัตโนมัติทุกการ เพิ่ม / แก้ไข / ลบ / ย้ายกิลด์ (แสดง 120 รายการล่าสุด — การจัดปาตี้ไม่ถูกบันทึก)</p>
+      <div class="sorts" id="logFilters" style="margin-bottom:10px;flex-wrap:wrap"></div>
       <div id="logList"></div>
     </div>
   </div>
@@ -1312,7 +1323,23 @@ function renderMgSorts(){
   });
 }
 function mgCmp(a,b){return mgSort==="cp"?b.cp-a.cp:mgSort==="name"?a.ign.localeCompare(b.ign):(a.cls.localeCompare(b.cls)||b.cp-a.cp);}
+var mgTab=0;
+function renderMgTabs(){
+  var box=document.getElementById("mgTabs");if(!box)return;
+  box.innerHTML="";
+  GUILDS.forEach(function(g,i){
+    var n=mgAll?mgAll.filter(function(m){return m.guild===g.key;}).length:null;
+    var b=document.createElement("button");
+    b.className="mgtab"+(i===mgTab?" on":"");
+    b.style.setProperty("--gt",g.color);
+    if(i!==mgTab)b.style.color=g.color;
+    b.innerHTML=g.key+"<small>"+(n==null?"กำลังโหลด...":n+" คน")+"</small>";
+    b.onclick=function(){mgTab=i;renderManage();};
+    box.appendChild(b);
+  });
+}
 function renderManage(){
+  renderMgTabs();
   var list=document.getElementById("mgList");list.innerHTML="";
   var cnt=document.getElementById("mgCount"),dupBox=document.getElementById("mgDup");
   if(mgAll==null){cnt.textContent="";dupBox.classList.add("hidden");list.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';return;}
@@ -1328,11 +1355,11 @@ function renderManage(){
   var q=(document.getElementById("mgSearch").value||"").trim().toLowerCase();
   var total=0,cut=staleCut_(),staleTotal=0;
   var isStale=function(m){return !!(m.upd&&new Date(m.upd)<cut);};
-  GUILDS.forEach(function(g){
+  GUILDS.forEach(function(g,gi){
     var arr=mgAll.filter(function(m){return m.guild===g.key&&(!q||m.ign.toLowerCase().includes(q)||m.cls.toLowerCase().includes(q));});
     total+=arr.length;
     var staleN=arr.filter(isStale).length;staleTotal+=staleN;
-    var col=document.createElement("div");col.className="mgcol";col.style.setProperty("--gc",g.color);
+    var col=document.createElement("div");col.className="mgcol"+(gi===mgTab?" on":"");col.style.setProperty("--gc",g.color);
     var h=document.createElement("div");h.className="mgcolhead";
     h.innerHTML='<span class="dot2" style="background:'+g.color+'"></span><b style="color:'+g.color+'">'+g.key+'</b>'+
       '<span class="gmeta" style="margin-left:auto">'+arr.length+' คน'+(staleN?' • <b style="color:#ff9c9c">⏰ '+staleN+' ไม่ขยับ</b>':'')+'</span>';
@@ -1561,27 +1588,48 @@ async function impSave(){
 }
 
 /* ---------- ประวัติการแก้ไข ---------- */
+var logRows=null,logG="";
 function logOpen(){
   if(!IS_ADMIN)return;
   document.getElementById("logOv").classList.remove("hidden");
-  var box=document.getElementById("logList");
-  box.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
-  srv("getLog").then(function(rows){
-    box.innerHTML="";
-    if(!rows||!rows.length){box.innerHTML='<div class="poolempty">— ยังไม่มีประวัติ —</div>';return;}
-    var AC={"เพิ่ม":["#14301f","#8fe0a8"],"แก้ไข":["#33290f","#ffd35c"],"ลบ":["#3a1c1c","#ff9c9c"],"ย้ายกิลด์":["#0f2c38","#4fd8ff"]};
-    rows.forEach(function(r){
-      var c=AC[r.action]||["#222","#aaa"];
-      var d=new Date(r.at);
-      var ts=("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
-      var el=document.createElement("div");el.className="mgrow";
-      el.innerHTML='<span class="gmeta" style="flex:none;width:78px">'+ts+'</span>'+
-        '<span class="badge" style="flex:none;background:'+c[0]+';color:'+c[1]+'">'+r.action+'</span>'+
-        '<span class="nm" style="flex:none;max-width:130px">'+(r.ign||"")+'</span>'+
-        '<span class="gmeta" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+String(r.detail||"").replace(/"/g,"&quot;")+'">'+(r.detail||"")+(r.guild?" ["+r.guild+"]":"")+'</span>';
-      box.appendChild(el);
-    });
-  }).catch(function(e){box.innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
+  logRows=null;renderLogFilters();renderLog();
+  srv("getLog").then(function(rows){logRows=rows||[];renderLogFilters();renderLog();})
+    .catch(function(e){document.getElementById("logList").innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
+}
+function renderLogFilters(){
+  var f=document.getElementById("logFilters");if(!f)return;
+  f.innerHTML="";
+  var opts=[["","ทั้งหมด"+(logRows?" ("+logRows.length+")":"")]].concat(
+    GUILDS.map(function(g){return [g.key,g.key+(logRows?" ("+logRows.filter(function(r){return r.guild===g.key;}).length+")":"")];}));
+  opts.forEach(function(p){
+    var b=document.createElement("button");b.className="chip"+(logG===p[0]?" on":"");
+    var gd=GUILDS.find(function(g){return g.key===p[0];});
+    if(gd&&logG!==p[0])b.style.color=gd.color;
+    b.textContent=p[1];
+    b.onclick=function(){logG=p[0];renderLogFilters();renderLog();};
+    f.appendChild(b);
+  });
+}
+function renderLog(){
+  var box=document.getElementById("logList");box.innerHTML="";
+  if(logRows==null){box.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';return;}
+  var rows=logRows.filter(function(r){return !logG||r.guild===logG;});
+  if(!rows.length){box.innerHTML='<div class="poolempty">— ยังไม่มีประวัติ'+(logG?'ของ '+logG:'')+' —</div>';return;}
+  var AC={"เพิ่ม":["#14301f","#8fe0a8"],"แก้ไข":["#33290f","#ffd35c"],"ลบ":["#3a1c1c","#ff9c9c"],"ย้ายกิลด์":["#0f2c38","#4fd8ff"]};
+  rows.forEach(function(r){
+    var c=AC[r.action]||["#222","#aaa"];
+    var gd=GUILDS.find(function(g){return g.key===r.guild;});
+    var gc=(gd&&gd.color)||"#888";
+    var d=new Date(r.at);
+    var ts=("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+    var el=document.createElement("div");el.className="mgrow";
+    el.innerHTML='<span class="gmeta" style="flex:none;width:74px">'+ts+'</span>'+
+      '<span class="badge" style="flex:none;background:'+c[0]+';color:'+c[1]+'">'+r.action+'</span>'+
+      '<span class="badge" style="flex:none;background:'+gc+'22;color:'+gc+';border:1px solid '+gc+'55">'+(r.guild||"?")+'</span>'+
+      '<span class="nm" style="flex:none;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(r.ign||"")+'</span>'+
+      '<span class="gmeta" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+String(r.detail||"").replace(/"/g,"&quot;")+'">'+(r.detail||"")+'</span>';
+    box.appendChild(el);
+  });
 }
 function logClose(){document.getElementById("logOv").classList.add("hidden");}
 
