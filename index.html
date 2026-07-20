@@ -289,6 +289,7 @@
         <div style="font-size:19px;font-weight:800">จัดการรายชื่อทุกกิลด์</div>
         <div class="gmeta">เฉพาะแอดมิน — ลบ / แก้ไขตัวละครได้จากที่เดียว</div>
       </div>
+      <button class="toolbtn g" onclick="impOpen()">📷 นำเข้าจากรูป</button>
       <button class="toolbtn" onclick="closeManage()">↩ กลับหน้าเลือกกิลด์</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:11px;flex-wrap:wrap;align-items:center">
@@ -325,6 +326,28 @@
         <button class="toolbtn" style="flex:1;justify-content:center" onclick="mgDelClose()">ยกเลิก</button>
         <button class="primary" id="mgDelGo" onclick="mgDelDo()" style="flex:1;background:var(--danger)">🗑 ลบถาวร</button>
       </div>
+    </div>
+  </div>
+  <div id="impOv" class="hidden" onclick="if(event.target===this)impClose()" style="position:fixed;inset:0;background:rgba(5,7,16,.78);z-index:74;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div class="card" style="width:100%;max-width:640px;max-height:92vh;overflow:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <h3 style="margin:0;flex:1">📷 นำเข้ารายชื่อจากรูป</h3>
+        <button class="rclose" style="margin-left:0" onclick="impClose()">✕</button>
+      </div>
+      <p class="csub">แคปหน้ารายชื่อกิลด์จากเกม เลือกได้ทีละหลายรูป — ระบบอ่าน ชื่อ + คะแนน (ใช้เป็น CP) ให้ตรวจ/แก้ก่อนบันทึก · ชื่อที่มีในระบบแล้วจะอัปเดตเฉพาะ CP (อาชีพ/ก๊วน/ปาตี้ไม่กระทบ)</p>
+      <label>นำเข้าเข้ากิลด์ (เฉพาะชื่อใหม่ — ชื่อเดิมอยู่กิลด์ไหนก็อัปเดตที่นั่น)</label>
+      <select id="impGuild" style="margin-bottom:10px"></select>
+      <input id="impFiles" type="file" accept="image/*" multiple class="hidden" onchange="impAddFiles(this.files)">
+      <div id="impDrop" onclick="document.getElementById('impFiles').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--g)'"
+        ondragleave="this.style.borderColor=''"
+        ondrop="event.preventDefault();this.style.borderColor='';impAddFiles(event.dataTransfer.files)"
+        style="border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;margin-bottom:10px">
+        📥 ลากรูปมาวางตรงนี้ หรือกดเพื่อเลือกรูป (เลือกทีเดียวหลายรูปได้)
+      </div>
+      <div id="impStatus" class="gmeta" style="margin-bottom:8px"></div>
+      <div id="impList"></div>
+      <button class="primary hidden" id="impSave" onclick="impSave()" style="width:100%;margin-top:10px">💾 บันทึกทั้งหมด</button>
     </div>
   </div>
 </div>
@@ -1358,6 +1381,116 @@ function mgEditSave(){
     mgEditClose();renderManage();
   }).catch(function(e){busyBtn("mgSave",false);toast("บันทึกไม่ได้: "+((e&&e.message)||e));});
 }
+/* ---------- นำเข้ารายชื่อจากรูป (OCR ในเครื่อง — เฉพาะแอดมิน) ---------- */
+var impRows=[],impDb=null,impWorker=null;
+function impOpen(){
+  if(!IS_ADMIN)return;
+  impRows=[];impDb=null;
+  var sel=document.getElementById("impGuild");
+  sel.innerHTML=GUILDS.map(function(g){return '<option value="'+g.key+'">'+g.key+'</option>';}).join("");
+  document.getElementById("impStatus").textContent="";
+  document.getElementById("impList").innerHTML="";
+  document.getElementById("impSave").classList.add("hidden");
+  document.getElementById("impOv").classList.remove("hidden");
+  srv("getAll").then(function(r){impDb=r;impRender();}).catch(function(){});
+}
+function impClose(){document.getElementById("impOv").classList.add("hidden");}
+function impLoadLib(){
+  return new Promise(function(res,rej){
+    if(window.Tesseract)return res();
+    var s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    s.onload=res;s.onerror=function(){rej(new Error("โหลดตัวอ่านรูปไม่ได้ — เช็คอินเทอร์เน็ต"));};
+    document.head.appendChild(s);
+  });
+}
+async function impAddFiles(files){
+  files=[].slice.call(files||[]).filter(function(f){return /^image\//.test(f.type);});
+  if(!files.length)return;
+  var st=document.getElementById("impStatus");
+  try{
+    st.textContent="⏳ กำลังเตรียมตัวอ่านรูป (ครั้งแรกอาจรอ ~10 วิ)...";
+    await impLoadLib();
+    if(!impWorker)impWorker=await Tesseract.createWorker("eng");
+    for(var i=0;i<files.length;i++){
+      st.textContent="⏳ กำลังอ่านรูปที่ "+(i+1)+"/"+files.length+" ...";
+      var out=await impWorker.recognize(files[i]);
+      impParse(out.data);
+      impRender();
+    }
+    st.textContent="✅ อ่านครบ "+files.length+" รูป — ได้ "+impRows.length+" ชื่อ ตรวจ/แก้แล้วกดบันทึก (แถวไหนอ่านเพี้ยนกด ✕ ทิ้งได้)";
+  }catch(e){st.textContent="อ่านรูปไม่ได้: "+((e&&e.message)||e);}
+  document.getElementById("impFiles").value="";
+}
+function impParse(data){
+  var lines=data.lines;
+  if(!lines||!lines.length)
+    lines=String(data.text||"").split("\n").map(function(t){return {words:t.split(/\s+/).map(function(x){return {text:x};})};});
+  lines.forEach(function(ln){
+    var words=(ln.words||[]).map(function(w){return String(w.text||"").trim();}).filter(Boolean);
+    if(!words.length)return;
+    var name=null;
+    for(var i=0;i<words.length;i++){
+      var w=words[i].replace(/^[^A-Za-z0-9_]+|[^A-Za-z0-9_]+$/g,"");
+      if(/^[A-Za-z0-9_]{3,20}$/.test(w)&&/[A-Za-z]/.test(w)){name=w;break;}
+    }
+    if(!name)return;
+    if({Guild:1,Title:1,Online:1,Charming:1,Star:1}[name])return;
+    var slashAt=-1;
+    for(var j=0;j<words.length;j++)if(words[j].indexOf("/")>=0){slashAt=j;break;}
+    var cands=[];
+    words.forEach(function(w2,k){var n=w2.replace(/[,\.]/g,"");if(/^\d{3,7}$/.test(n))cands.push({k:k,v:parseInt(n,10)});});
+    var score=null;
+    if(slashAt>=0){for(var c=cands.length-1;c>=0;c--)if(cands[c].k<slashAt){score=cands[c].v;break;}}
+    if(score==null&&cands.length)score=cands[0].v;
+    if(score==null)return; // ไม่มีตัวเลข = ไม่ใช่แถวสมาชิก
+    var key=name.toLowerCase(),hit=null;
+    impRows.forEach(function(r){if(r.ign.toLowerCase()===key)hit=r;});
+    if(hit)hit.cp=score;else impRows.push({ign:name,cp:score});
+  });
+}
+function impRender(){
+  var box=document.getElementById("impList");box.innerHTML="";
+  document.getElementById("impSave").classList.toggle("hidden",!impRows.length);
+  impRows.forEach(function(r,i){
+    var ex=impDb&&impDb.find(function(m){return m.ign.toLowerCase()===String(r.ign).toLowerCase();});
+    var el=document.createElement("div");el.className="mgrow";
+    var inp1=document.createElement("input");inp1.value=r.ign;inp1.style.cssText="flex:2;min-width:110px";
+    inp1.oninput=function(){impRows[i].ign=this.value;};
+    var inp2=document.createElement("input");inp2.type="number";inp2.value=r.cp;inp2.style.cssText="flex:1;min-width:80px";
+    inp2.oninput=function(){impRows[i].cp=parseInt(this.value)||0;};
+    var bd=document.createElement("span");bd.className="badge";
+    if(ex){bd.style.background="#33290f";bd.style.color="var(--gold)";bd.textContent="อัปเดต CP • "+ex.guild;}
+    else{bd.style.background="#14301f";bd.style.color="#8fe0a8";bd.textContent="ใหม่";}
+    var xb=document.createElement("button");xb.className="mgbtn del";xb.textContent="✕";
+    xb.onclick=function(){impRows.splice(i,1);impRender();};
+    el.appendChild(inp1);el.appendChild(inp2);el.appendChild(bd);el.appendChild(xb);
+    box.appendChild(el);
+  });
+}
+async function impSave(){
+  if(!impRows.length||!sb)return;
+  var gk=document.getElementById("impGuild").value;
+  busyBtn("impSave",true,"⏳ กำลังบันทึก...");
+  try{
+    var all=await fetchAll_();
+    var ins=[],upd=0,seen={};
+    for(var i=0;i<impRows.length;i++){
+      var nm=String(impRows[i].ign||"").trim(),cp=Number(impRows[i].cp)||0;
+      if(!nm||seen[nm.toLowerCase()])continue;seen[nm.toLowerCase()]=1;
+      var ex=all.find(function(m){return m.ign.toLowerCase()===nm.toLowerCase();});
+      if(ex){chk_(await sb.from("members").update({cp:cp}).eq("ign",ex.ign).select());upd++;}
+      else ins.push({guild:gk,ign:nm,cls:"",cp:cp,is_leader:false,leader:null,party:-1,slot:-1});
+    }
+    if(ins.length)chk_(await sb.from("members").insert(ins).select());
+    busyBtn("impSave",false);
+    toast("นำเข้าแล้ว — ใหม่ "+ins.length+" คน • อัปเดต CP "+upd+" คน ✅");
+    impRows=[];impClose();
+    srv("getAll").then(function(r){mgAll=r;renderManage();}).catch(function(){});
+    loadCounts();
+  }catch(e){busyBtn("impSave",false);toast("บันทึกไม่ได้: "+((e&&e.message)||e));}
+}
+
 /* init */
 renderPick();loadCounts();
 if(!sb){
