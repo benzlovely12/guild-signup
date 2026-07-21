@@ -683,7 +683,7 @@ function loadMemberX(m){
   document.getElementById("updSlot").classList.remove("hidden");
   var _hereG=G().key;
   document.getElementById("editWho").innerHTML='กำลังแก้ไข <b style="color:var(--txt)">'+m.ign+'</b> — กิลด์ '+m.guild+
-    (m.guild!==_hereG?'<div class="dupwarn" style="margin-top:8px">⚠️ ตัวนี้อยู่<b>กิลด์ '+m.guild+'</b> ไม่ใช่กิลด์ที่เปิดอยู่ ('+_hereG+')<br>กดบันทึกจะแก้ข้อมูลแต่<b>ตัวยังอยู่กิลด์ '+m.guild+' เหมือนเดิม</b> — ถ้าจะย้ายมากิลด์นี้ กด <button class="dupbtn" data-n="'+m.ign+'" data-g="'+m.guild+'" data-to="'+_hereG+'" onclick="moveHere(this)">⇄ ย้ายมากิลด์ '+_hereG+'</button></div>':'');
+    (m.guild!==_hereG?'<div style="margin-top:8px;background:color-mix(in srgb,var(--g) 9%,#141a2e);border:1px solid color-mix(in srgb,var(--g) 28%,var(--line));color:#c3cbe8;border-radius:9px;padding:9px 11px;font-size:12.5px;line-height:1.55">ℹ️ ตัวนี้อยู่<b style="color:var(--txt)">กิลด์ '+m.guild+'</b> — แก้ได้เลย บันทึกแล้วตัวยังอยู่กิลด์เดิม<br><button class="dupbtn" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);margin-top:6px" data-n="'+m.ign+'" data-g="'+m.guild+'" data-to="'+_hereG+'" onclick="moveHere(this)">⇄ ถ้าจะย้ายมากิลด์ '+_hereG+' กดนี่</button></div>':'');
   document.getElementById("ign").value="";document.getElementById("ign").placeholder="เว้นว่าง = "+m.ign;
   var il=document.getElementById("ignLabel");if(il)il.textContent="ชื่อใหม่ (เดิม: "+m.ign+")";
   document.getElementById("cls").value=m.cls;
@@ -1640,18 +1640,25 @@ if(!sb){
     '<div style="position:fixed;bottom:0;left:0;right:0;z-index:99;background:#3a1c1c;border-top:2px solid #6b2f2f;color:#ffc9c9;padding:12px 16px;font-size:13.5px;text-align:center;font-weight:700">\u26a0\ufe0f \u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32 Supabase \u2014 \u0e40\u0e1b\u0e34\u0e14\u0e44\u0e1f\u0e25\u0e4c index.html \u0e14\u0e49\u0e27\u0e22 Notepad \u0e41\u0e25\u0e49\u0e27\u0e27\u0e32\u0e07 SUPABASE_URL \u0e01\u0e31\u0e1a SUPABASE_ANON_KEY (\u0e14\u0e39\u0e04\u0e39\u0e48\u0e21\u0e37\u0e2d)</div>');
 }else{
   try{
-    sb.channel("guild-rt")
-      .on("postgres_changes",{event:"*",schema:"public",table:"members"},function(){
+    var _rtT=null;
+    var rtSync=function(){
+      clearTimeout(_rtT);
+      _rtT=setTimeout(function(){       // หน่วง 1.2 วิ รวบหลายการเปลี่ยนแปลงเป็นรอบเดียว กันกระตุก
+        _rtT=null;
         if(canPoll())loadGuild(G().key,true);
         var pick=document.getElementById("pick");
         if(pick&&!pick.classList.contains("hidden"))loadCounts();
-        if(mgAll!=null&&!document.getElementById("manage").classList.contains("hidden")){
+        var mng=document.getElementById("manage");
+        // ไม่รีเฟรชหน้าจัดการถ้ากำลังเปิด popup แก้ไข/ลบ/นำเข้า/ประวัติ อยู่ (กันงานสะดุด)
+        var busyOv=["mgOv","mgDelOv","impOv","logOv"].some(function(id){var e=document.getElementById(id);return e&&!e.classList.contains("hidden");});
+        if(mgAll!=null&&mng&&!mng.classList.contains("hidden")&&!busyOv){
           srv("getAll").then(function(r){mgAll=r;renderManage();}).catch(function(){});
         }
-      })
-      .on("postgres_changes",{event:"*",schema:"public",table:"board_mode"},function(){
-        if(canPoll())loadGuild(G().key,true);
-      })
+      },1200);
+    };
+    sb.channel("guild-rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"members"},rtSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"board_mode"},rtSync)
       .subscribe();
   }catch(e){}
 }
