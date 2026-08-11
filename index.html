@@ -73,14 +73,14 @@
   #parties{display:block}
   .room{margin-bottom:20px}
   .room-title{font-size:14px;font-weight:800;color:var(--muted);margin:2px 0 11px;letter-spacing:.3px}
-  .groups4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  .groupbox{border:2px solid var(--gc,#2a3252);border-radius:16px;padding:10px 10px 12px;background:linear-gradient(180deg,color-mix(in srgb,var(--gc,#2a3252) 8%,transparent),transparent)}
+  .groups4{display:flex;flex-direction:column;gap:14px}
+  .groupbox{border:2px solid var(--gc,#2a3252);border-radius:16px;padding:10px 12px 13px;background:linear-gradient(180deg,color-mix(in srgb,var(--gc,#2a3252) 8%,transparent),transparent)}
   .groupbox .glabel{display:flex;align-items:center;gap:8px;font-weight:900;font-size:16px;margin:2px 3px 11px}
   .groupbox .glabel .gcp{margin-left:auto;font-size:12px;color:var(--gold);font-weight:800}
-  .gparties{display:flex;flex-direction:column;gap:10px}
+  .gparties{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   .parties-flat{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-  @media(max-width:1100px){.groups4{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:640px){.groups4{grid-template-columns:1fr}.parties-flat{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+  @media(max-width:820px){.gparties{grid-template-columns:1fr}}
+  @media(max-width:640px){.parties-flat{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
   .party{background:linear-gradient(180deg,#161c31,#12172a);border:1px solid var(--line);border-radius:13px;padding:10px}
   .party h4{margin:0 0 8px;font-size:13px;display:flex;align-items:center;gap:6px}
   .party h4 .pname{font-weight:800}
@@ -792,7 +792,7 @@ function buildParties(){
   // ---- ห้องบน: 4 กลุ่ม A–D กลุ่มละ 3 ตี้ (มีกรอบครอบให้ดูง่าย) ----
   const upRoom=document.createElement("div");upRoom.className="room";
   upRoom.innerHTML=`<div class="room-title">🔺 ห้องบน — แข่งกลุ่ม ${GROUP_LETTERS.slice(0,nGroups).join(" · ")}</div>`;
-  const g4=document.createElement("div");g4.className="groups4";g4.style.gridTemplateColumns=`repeat(${nGroups},1fr)`;
+  const g4=document.createElement("div");g4.className="groups4";
   for(let gi=0;gi<nGroups;gi++){
     const col=GROUP_COLORS[gi]||"#888",from=gi*3,to=Math.min(from+3,UPPER_PARTIES);
     const gb=document.createElement("div");gb.className="groupbox";gb.style.setProperty("--gc",col);
