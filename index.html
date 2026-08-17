@@ -785,32 +785,41 @@ function makeParty(pi){
   return el;
 }
 function sumCP(from,to){const g=G();let s=0;for(let pi=from;pi<to;pi++)g.parties[pi].forEach(m=>{if(m)s+=m.cp;});return s;}
+function makeGroupBox(letter,color,from,to){
+  const gb=document.createElement("div");gb.className="groupbox";gb.style.setProperty("--gc",color);
+  const lab=document.createElement("div");lab.className="glabel";lab.style.color=color;
+  lab.innerHTML=`กลุ่ม ${letter}<span class="gcp">${(sumCP(from,to)/1000).toFixed(0)}k</span>`;
+  gb.appendChild(lab);
+  const gp=document.createElement("div");gp.className="gparties";
+  for(let pi=from;pi<to;pi++)gp.appendChild(makeParty(pi));
+  gb.appendChild(gp);
+  return gb;
+}
 function buildParties(){
   loadAbsent();
   const box=document.getElementById("parties");box.innerHTML="";
-  const nGroups=Math.max(1,Math.floor(UPPER_PARTIES/3));
-  // ---- ห้องบน: 4 กลุ่ม A–D กลุ่มละ 3 ตี้ (มีกรอบครอบให้ดูง่าย) ----
+  const nUp=Math.max(1,Math.floor(UPPER_PARTIES/3));   // ห้องบน: กลุ่มละ 3 ตี้
+  // ---- ห้องบน: กลุ่ม A–D กลุ่มละ 3 ตี้ ----
   const upRoom=document.createElement("div");upRoom.className="room";
-  upRoom.innerHTML=`<div class="room-title">🔺 ห้องบน — แข่งกลุ่ม ${GROUP_LETTERS.slice(0,nGroups).join(" · ")}</div>`;
+  upRoom.innerHTML=`<div class="room-title">🔺 ห้องบน — แข่งกลุ่ม ${GROUP_LETTERS.slice(0,nUp).join(" · ")}</div>`;
   const g4=document.createElement("div");g4.className="groups4";
-  for(let gi=0;gi<nGroups;gi++){
-    const col=GROUP_COLORS[gi]||"#888",from=gi*3,to=Math.min(from+3,UPPER_PARTIES);
-    const gb=document.createElement("div");gb.className="groupbox";gb.style.setProperty("--gc",col);
-    const lab=document.createElement("div");lab.className="glabel";lab.style.color=col;
-    lab.innerHTML=`กลุ่ม ${GROUP_LETTERS[gi]}<span class="gcp">${(sumCP(from,to)/1000).toFixed(0)}k</span>`;
-    gb.appendChild(lab);
-    const gp=document.createElement("div");gp.className="gparties";
-    for(let pi=from;pi<to;pi++)gp.appendChild(makeParty(pi));
-    gb.appendChild(gp);g4.appendChild(gb);
+  for(let gi=0;gi<nUp;gi++){
+    const from=gi*3,to=Math.min(from+3,UPPER_PARTIES);
+    g4.appendChild(makeGroupBox(GROUP_LETTERS[gi],GROUP_COLORS[gi]||"#888",from,to));
   }
   upRoom.appendChild(g4);box.appendChild(upRoom);
-  // ---- ห้องล่าง: ตี้ปกติ ----
+  // ---- ห้องล่าง: กลุ่ม E–G กลุ่มละ 6 ตี้ ----
   if(PARTY_COUNT>UPPER_PARTIES){
+    const nLo=Math.ceil((PARTY_COUNT-UPPER_PARTIES)/6);
+    const letters=[];for(let i=0;i<nLo;i++)letters.push(GROUP_LETTERS[nUp+i]);
     const loRoom=document.createElement("div");loRoom.className="room";
-    loRoom.innerHTML=`<div class="room-title">🔻 ห้องล่าง — ตี้ปกติ</div>`;
-    const flat=document.createElement("div");flat.className="parties-flat";
-    for(let pi=UPPER_PARTIES;pi<PARTY_COUNT;pi++)flat.appendChild(makeParty(pi));
-    loRoom.appendChild(flat);box.appendChild(loRoom);
+    loRoom.innerHTML=`<div class="room-title">🔻 ห้องล่าง — กลุ่ม ${letters.join(" · ")} (กลุ่มละ 6 ตี้)</div>`;
+    const g4l=document.createElement("div");g4l.className="groups4";
+    for(let gi=0;gi<nLo;gi++){
+      const from=UPPER_PARTIES+gi*6,to=Math.min(from+6,PARTY_COUNT);
+      g4l.appendChild(makeGroupBox(GROUP_LETTERS[nUp+gi],GROUP_COLORS[nUp+gi]||"#888",from,to));
+    }
+    loRoom.appendChild(g4l);box.appendChild(loRoom);
   }
 }
 function renderSlot(slot,m){
