@@ -306,9 +306,12 @@
   table.chartbl td.rk{color:var(--muted);text-align:center;width:38px}
   table.chartbl td.nm{text-align:left;font-weight:700;max-width:210px;overflow:hidden;text-overflow:ellipsis}
   table.chartbl tbody tr:hover{background:#1b2238}
-  table.chartbl td.diff.up{color:#5be08a}
+  table.chartbl td.diff.up{color:#5be08a;font-weight:700}
+  table.chartbl td.diff.low{color:#ffd35c;font-weight:700}
   table.chartbl td.diff.down{color:var(--danger)}
-  table.chartbl td.diff.flat{color:var(--muted)}
+  table.chartbl td.diff.flat,table.chartbl td.diff.none{color:var(--muted)}
+  table.chartbl th.sortable{cursor:pointer;user-select:none}
+  table.chartbl th.sortable:hover{color:var(--txt)}
   table.chartbl td.wk3{color:var(--gold);font-weight:800}
   .miniedit,.minidel{border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:4px 9px;font-size:13px;cursor:pointer;margin-left:4px}
   .miniedit:hover{border-color:var(--g)} .minidel:hover{border-color:var(--danger);color:var(--danger)}
@@ -1815,16 +1818,48 @@ async function fetchPIG(){
 }
 function latestWeekCP(m){return m.cp_w3!=null?m.cp_w3:m.cp_w2!=null?m.cp_w2:m.cp_w1!=null?m.cp_w1:(m.cp||0);}
 function fmtK(v){return v==null?'–':(v/1000).toFixed(0)+'k';}
-function diffTd(a,b){
-  if(a==null||b==null) return '<td class="diff flat">–</td>';
-  var d=b-a, cls=d>0?'up':d<0?'down':'flat', s=(d>0?'+':'')+(d/1000).toFixed(1)+'k';
-  return '<td class="diff '+cls+'">'+s+'</td>';
+/* ---- ตาราง CP: sort อิสระ + สีตามค่าเฉลี่ยกิลด์แต่ละรอบ ---- */
+var CT={rows:[],manage:false,container:'progBody',key:'latest',dir:'desc'};
+function roundDiff(m,which){
+  if(which==='d21') return (m.cp_w1!=null&&m.cp_w2!=null)?m.cp_w2-m.cp_w1:null;
+  return (m.cp_w2!=null&&m.cp_w3!=null)?m.cp_w3-m.cp_w2:null;
 }
-function buildCharTable(rows,manage){
+function roundAvg(rows,which){
+  var v=rows.map(function(m){return roundDiff(m,which);}).filter(function(x){return x!=null;});
+  return v.length? v.reduce(function(a,b){return a+b;},0)/v.length : null;
+}
+function diffTd(a,b,avg){
+  if(a==null||b==null) return '<td class="diff none">–</td>';
+  var d=b-a, cls=(avg==null)?'flat':(d>=avg?'up':'low'), s=(d>0?'+':'')+(d/1000).toFixed(1)+'k';
+  var tip=(avg==null)?'':'เฉลี่ยกิลด์รอบนี้ '+(avg>=0?'+':'')+(avg/1000).toFixed(1)+'k';
+  return '<td class="diff '+cls+'" title="'+tip+'">'+s+'</td>';
+}
+function ctVal(m,k){
+  switch(k){
+    case 'name': return m.ign||'';
+    case 'cls': return m.cls||'';
+    case 'w1': return m.cp_w1!=null?m.cp_w1:-Infinity;
+    case 'w2': return m.cp_w2!=null?m.cp_w2:-Infinity;
+    case 'w3': return m.cp_w3!=null?m.cp_w3:-Infinity;
+    case 'd21': { var x=roundDiff(m,'d21'); return x==null?-Infinity:x; }
+    case 'd32': { var y=roundDiff(m,'d32'); return y==null?-Infinity:y; }
+    default: return latestWeekCP(m);
+  }
+}
+function charSort(k){
+  if(CT.key===k){CT.dir=CT.dir==='desc'?'asc':'desc';}
+  else{CT.key=k;CT.dir=(k==='name'||k==='cls')?'asc':'desc';}
+  renderCT();
+}
+function ctHead(k,label,cls){
+  var ind=CT.key===k?(CT.dir==='asc'?' ▲':' ▼'):'';
+  return '<th class="'+(cls?cls+' ':'')+'sortable" onclick="charSort(\''+k+'\')">'+label+ind+'</th>';
+}
+function buildCharTable(rows,manage,avg){
   if(!rows.length) return '<div class="poolempty">— ยังไม่มีข้อมูล —</div>';
   var h='<table class="chartbl"><thead><tr>'+
-    '<th class="rk">#</th><th class="nm">ชื่อตัวละคร</th><th>อาชีพ</th>'+
-    '<th>CP สัปดาห์ 1</th><th>Δ (2-1)</th><th>CP สัปดาห์ 2</th><th>Δ (3-2)</th><th>CP สัปดาห์ 3</th>'+
+    '<th class="rk">#</th>'+ctHead('name','ชื่อตัวละคร','nm')+ctHead('cls','อาชีพ')+
+    ctHead('w1','CP สัปดาห์ 1')+ctHead('d21','Δ (2-1)')+ctHead('w2','CP สัปดาห์ 2')+ctHead('d32','Δ (3-2)')+ctHead('w3','CP สัปดาห์ 3')+
     (manage?'<th>จัดการ</th>':'')+'</tr></thead><tbody>';
   rows.forEach(function(m,i){
     var col=classColor(m.cls);
@@ -1832,26 +1867,41 @@ function buildCharTable(rows,manage){
       '<td class="rk">'+(i+1)+'</td>'+
       '<td class="nm">'+(m.is_leader?'👑 ':'')+escHtml(m.ign)+'</td>'+
       '<td><span class="badge" style="background:'+col+'22;color:'+col+'">'+escHtml(m.cls||'–')+'</span></td>'+
-      '<td>'+fmtK(m.cp_w1)+'</td>'+diffTd(m.cp_w1,m.cp_w2)+
-      '<td>'+fmtK(m.cp_w2)+'</td>'+diffTd(m.cp_w2,m.cp_w3)+
+      '<td>'+fmtK(m.cp_w1)+'</td>'+diffTd(m.cp_w1,m.cp_w2,avg.d21)+
+      '<td>'+fmtK(m.cp_w2)+'</td>'+diffTd(m.cp_w2,m.cp_w3,avg.d32)+
       '<td class="wk3">'+fmtK(m.cp_w3)+'</td>'+
       (manage?'<td><button class="miniedit" onclick="mngEdit('+i+')">✎</button><button class="minidel" onclick="mngDelete('+i+')">🗑</button></td>':'')+
       '</tr>';
   });
   return h+'</tbody></table>';
 }
+function renderCT(){
+  var rows=CT.rows.slice(),k=CT.key,dir=CT.dir;
+  rows.sort(function(a,b){
+    var va=ctVal(a,k),vb=ctVal(b,k),r;
+    if(typeof va==='string')r=va.localeCompare(vb,'th'); else r=(va===vb?0:va<vb?-1:1);
+    return dir==='asc'?r:-r;
+  });
+  if(CT.manage) window.__mngRows=rows;
+  var avg={d21:roundAvg(CT.rows,'d21'),d32:roundAvg(CT.rows,'d32')};
+  document.getElementById(CT.container).innerHTML=buildCharTable(rows,CT.manage,avg);
+}
+function renderCharTable(rows,manage,container){
+  CT={rows:rows,manage:manage,container:container,key:'latest',dir:'desc'};
+  renderCT();
+}
 function pageShow(id){["pick","app","manage","prog","mng"].forEach(function(x){var e=document.getElementById(x);if(e)e.classList.toggle("hidden",x!==id);});}
 function backFromPage(){pageShow("pick");renderPick();loadCounts();}
 function openProgress(){
   pageShow("prog");
   var b=document.getElementById("progBody");b.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
-  fetchPIG().then(function(ms){ms.sort(function(a,b){return latestWeekCP(b)-latestWeekCP(a);});b.innerHTML=buildCharTable(ms,false);})
+  fetchPIG().then(function(ms){renderCharTable(ms,false,'progBody');})
     .catch(function(e){b.innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
 }
 function openMng(){ if(!IS_ADMIN){toast("เฉพาะแอดมิน 🔒");return;} pageShow("mng"); loadMng(); }
 function loadMng(){
   var b=document.getElementById("mngBody");b.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
-  fetchPIG().then(function(ms){ms.sort(function(a,b){return latestWeekCP(b)-latestWeekCP(a);});window.__mngRows=ms;b.innerHTML=buildCharTable(ms,true);})
+  fetchPIG().then(function(ms){renderCharTable(ms,true,'mngBody');})
     .catch(function(e){b.innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
 }
 function mngDelete(i){
