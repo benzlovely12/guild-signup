@@ -293,6 +293,29 @@
 
   .simtag{display:inline-block;background:#332a14;color:var(--gold);border:1px solid #5a4a1e;border-radius:16px;padding:3px 10px;font-size:11.5px;font-weight:700;margin:2px 2px 0 0}
   .simtag.ex{background:#3a1c1c;color:#ff9c9c;border-color:#6b2f2f}
+  /* ===== หน้า พัฒนาการ / จัดการ (ตาราง CP รายสัปดาห์) ===== */
+  .pagewrap{max-width:1200px;margin:0 auto;padding:22px 16px 60px}
+  .pagehead{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .pageicon{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+  .pagetitle{font-size:19px;font-weight:800}
+  .tblwrap{background:linear-gradient(180deg,#161c31,#12172a);border:1px solid var(--line);border-radius:14px;padding:6px;overflow-x:auto}
+  table.chartbl{width:100%;border-collapse:collapse;font-size:13.5px;min-width:760px}
+  table.chartbl th{position:sticky;top:0;background:#1a2138;color:var(--muted);font-weight:700;padding:10px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line);z-index:1}
+  table.chartbl th.rk,table.chartbl th.nm{text-align:left}
+  table.chartbl td{padding:9px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid #222a44}
+  table.chartbl td.rk{color:var(--muted);text-align:center;width:38px}
+  table.chartbl td.nm{text-align:left;font-weight:700;max-width:210px;overflow:hidden;text-overflow:ellipsis}
+  table.chartbl tbody tr:hover{background:#1b2238}
+  table.chartbl td.diff.up{color:#5be08a}
+  table.chartbl td.diff.down{color:var(--danger)}
+  table.chartbl td.diff.flat{color:var(--muted)}
+  table.chartbl td.wk3{color:var(--gold);font-weight:800}
+  .miniedit,.minidel{border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:4px 9px;font-size:13px;cursor:pointer;margin-left:4px}
+  .miniedit:hover{border-color:var(--g)} .minidel:hover{border-color:var(--danger);color:var(--danger)}
+  .ovbg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px}
+  .ovcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;width:min(460px,95vw);max-height:90vh;overflow:auto}
+  .gcard.locked{opacity:.5;cursor:not-allowed}
+  .gcard.locked:hover{transform:none;border-color:var(--line)}
 </style>
 </head>
 <body>
@@ -393,6 +416,54 @@
   </div>
 </div>
 
+<!-- ===== หน้า พัฒนาการตัวละคร (PIGROCKS) ===== -->
+<div id="prog" class="hidden">
+  <div class="pagewrap">
+    <div class="pagehead">
+      <div class="pageicon" style="background:#0c2733;color:#4fd8ff">📈</div>
+      <div style="flex:1;min-width:180px">
+        <div class="pagetitle">การพัฒนาตัวละคร — PIGROCKS</div>
+        <div class="gmeta">CP รายสัปดาห์ • เรียงตาม CP ล่าสุด</div>
+      </div>
+      <button class="toolbtn" onclick="backFromPage()">↩ ย้อนกลับ</button>
+    </div>
+    <div class="tblwrap"><div id="progBody"></div></div>
+  </div>
+</div>
+
+<!-- ===== หน้า จัดการรายชื่อ (PIGROCKS — เฉพาะแอดมิน) ===== -->
+<div id="mng" class="hidden">
+  <div class="pagewrap">
+    <div class="pagehead">
+      <div class="pageicon" style="background:#1a1710;color:var(--gold)">🛠</div>
+      <div style="flex:1;min-width:180px">
+        <div class="pagetitle">จัดการรายชื่อ — PIGROCKS</div>
+        <div class="gmeta">แก้ไข / ลบ ตัวละคร (เฉพาะแอดมิน)</div>
+      </div>
+      <button class="toolbtn" onclick="loadMng()">⟳ รีเฟรช</button>
+      <button class="toolbtn" onclick="backFromPage()">↩ ย้อนกลับ</button>
+    </div>
+    <div class="tblwrap"><div id="mngBody"></div></div>
+  </div>
+  <div id="mngEditOv" class="ovbg hidden">
+    <div class="ovcard">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <h3 style="margin:0;flex:1">✎ แก้ไขตัวละคร</h3>
+        <button class="toolbtn" onclick="mngEditClose()">✕ ปิด</button>
+      </div>
+      <label>ชื่อตัวละคร (IGN)</label><input id="me_ign">
+      <label style="margin-top:10px;display:block">อาชีพ</label><select id="me_cls"></select>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+        <div><label>CP สัปดาห์ 1</label><input id="me_w1" type="number"></div>
+        <div><label>CP สัปดาห์ 2</label><input id="me_w2" type="number"></div>
+        <div><label>CP สัปดาห์ 3</label><input id="me_w3" type="number"></div>
+      </div>
+      <div id="me_status" class="gmeta" style="margin-top:8px"></div>
+      <button class="primary" style="width:100%;margin-top:12px" onclick="mngEditSave()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== APP ===== -->
 <div id="app" class="hidden" data-mtab="party">
   <img id="gcover" class="gcover" alt="cover">
@@ -407,8 +478,8 @@
       <span class="adminbadge hidden" id="adminBadge">โหมดแอดมิน — จัดปาตี้ได้</span>
       <span class="memberbadge" id="memberBadge">โหมดสมาชิก — ดูอย่างเดียว</span>
       <span class="gmeta" id="lastSync"></span>
-      <button class="toolbtn" onclick="manualRefresh()">⟳ รีเฟรช</button>
-      <button class="toolbtn" onclick="backToPick()">↩ เปลี่ยนกิลด์</button>
+      <button class="toolbtn hidden" onclick="manualRefresh()">⟳ รีเฟรช</button>
+      <button class="toolbtn" onclick="backToPick()">↩ ย้อนกลับ</button>
     </div>
   </header>
   <div class="mtabs">
@@ -416,8 +487,8 @@
     <button class="mtab" data-t="list" onclick="mtab('list')">รายชื่อ</button>
   </div>
 
-  <!-- TOP: registration -->
-  <div class="regbar">
+  <!-- TOP: registration (ปิดการอัปเดตเอง — ซ่อนไว้ทั้งหมด) -->
+  <div class="regbar hidden">
       <button class="rb new" style="flex:1;justify-content:center;max-width:420px" onclick="openSheet('menu')">📝 บันทึกข้อมูลตัวละคร</button>
     </div>
     <div class="card reg">
@@ -573,23 +644,29 @@ function leaderName(id){const m=memberById(id);return m?m.ign:"?"}
 /* ---------- guild select ---------- */
 function renderPick(){
   const box=document.getElementById("gcards");box.innerHTML="";
-  GUILDS.forEach((g,i)=>{
-    const el=document.createElement("div");el.className="gcard";el.style.setProperty("--gc",g.color);
-    const ic=g.img&&!g.img.startsWith("__")?`<img src="${g.img}" alt="${g.key}">`:g.logo;
-    el.innerHTML=`<div class="no">#${i+1}</div><div class="lg">${ic}</div>
-      <h2>${g.key}</h2><div class="tag">${g.tag}</div>
-      <div class="cnt">${g._count!=null?g._count:g.members.length} คนลงทะเบียน</div><div class="go">กดเพื่อเข้า →</div>`;
-    el.onclick=()=>openGuild(i);
-    box.appendChild(el);
-  });
-  if(IS_ADMIN){
-    const el=document.createElement("div");el.className="gcard";el.style.setProperty("--gc","#ffd35c");
-    el.innerHTML='<div class="no">🛠</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:56px;background:#1a1710">🛠</div>'+
-      '<h2>จัดการรายชื่อ</h2><div class="tag">รายชื่อทุกกิลด์ในที่เดียว — ลบ / แก้ไขตัวละคร</div>'+
-      '<div class="cnt">เฉพาะแอดมิน</div><div class="go">กดเพื่อเข้า →</div>';
-    el.onclick=openManage;
-    box.appendChild(el);
-  }
+  // 1) การ์ดกิลด์ PIGROCKS (เหลือกิลด์เดียว)
+  const g=GUILDS[0];
+  const el=document.createElement("div");el.className="gcard";el.style.setProperty("--gc",g.color);
+  const ic=g.img&&!g.img.startsWith("__")?`<img src="${g.img}" alt="${g.key}">`:g.logo;
+  el.innerHTML=`<div class="no">#1</div><div class="lg">${ic}</div>
+    <h2>${g.key}</h2><div class="tag">${g.tag}</div>
+    <div class="cnt">${g._count!=null?g._count:g.members.length} คนลงทะเบียน</div><div class="go">กดเพื่อเข้า →</div>`;
+  el.onclick=()=>openGuild(0);
+  box.appendChild(el);
+  // 2) การ์ด การพัฒนาตัวละคร (ดูอย่างเดียว ทุกคนเข้าได้)
+  const p=document.createElement("div");p.className="gcard";p.style.setProperty("--gc","#4fd8ff");
+  p.innerHTML='<div class="no">📈</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:#0c2733">📈</div>'+
+    '<h2>การพัฒนาตัวละคร</h2><div class="tag">ดูพัฒนาการ CP รายสัปดาห์ของ PIGROCKS</div>'+
+    '<div class="cnt">ดูอย่างเดียว</div><div class="go">กดเพื่อเข้า →</div>';
+  p.onclick=openProgress;
+  box.appendChild(p);
+  // 3) การ์ด จัดการรายชื่อ (โชว์ทุกคน แต่เปิดได้เฉพาะแอดมิน)
+  const m=document.createElement("div");m.className="gcard"+(IS_ADMIN?"":" locked");m.style.setProperty("--gc","#ffd35c");
+  m.innerHTML='<div class="no">'+(IS_ADMIN?"🛠":"🔒")+'</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:#1a1710">🛠</div>'+
+    '<h2>จัดการรายชื่อ</h2><div class="tag">แก้ไข / ลบ ตัวละคร PIGROCKS</div>'+
+    '<div class="cnt">'+(IS_ADMIN?"เฉพาะแอดมิน":"🔒 เฉพาะแอดมิน")+'</div><div class="go">'+(IS_ADMIN?"กดเพื่อเข้า →":"ล็อกอยู่")+'</div>';
+  m.onclick=IS_ADMIN?openMng:function(){toast("หน้านี้เฉพาะแอดมินเท่านั้น 🔒");};
+  box.appendChild(m);
 }
 function openGuild(i){
   cur=i;const g=G();
@@ -1727,6 +1804,96 @@ function renderLog(){
   });
 }
 function logClose(){document.getElementById("logOv").classList.add("hidden");}
+
+/* ===== หน้า พัฒนาการ / จัดการรายชื่อ (PIGROCKS) ===== */
+function escHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+async function fetchPIG(){
+  if(!sb) throw new Error("ยังไม่ได้ตั้งค่า Supabase");
+  const r=await sb.from('members').select('*').eq('guild','PIGROCKS');
+  if(r.error) throw new Error(r.error.message);
+  return r.data;
+}
+function latestWeekCP(m){return m.cp_w3!=null?m.cp_w3:m.cp_w2!=null?m.cp_w2:m.cp_w1!=null?m.cp_w1:(m.cp||0);}
+function fmtK(v){return v==null?'–':(v/1000).toFixed(0)+'k';}
+function diffTd(a,b){
+  if(a==null||b==null) return '<td class="diff flat">–</td>';
+  var d=b-a, cls=d>0?'up':d<0?'down':'flat', s=(d>0?'+':'')+(d/1000).toFixed(1)+'k';
+  return '<td class="diff '+cls+'">'+s+'</td>';
+}
+function buildCharTable(rows,manage){
+  if(!rows.length) return '<div class="poolempty">— ยังไม่มีข้อมูล —</div>';
+  var h='<table class="chartbl"><thead><tr>'+
+    '<th class="rk">#</th><th class="nm">ชื่อตัวละคร</th><th>อาชีพ</th>'+
+    '<th>CP สัปดาห์ 1</th><th>Δ (2-1)</th><th>CP สัปดาห์ 2</th><th>Δ (3-2)</th><th>CP สัปดาห์ 3</th>'+
+    (manage?'<th>จัดการ</th>':'')+'</tr></thead><tbody>';
+  rows.forEach(function(m,i){
+    var col=classColor(m.cls);
+    h+='<tr>'+
+      '<td class="rk">'+(i+1)+'</td>'+
+      '<td class="nm">'+(m.is_leader?'👑 ':'')+escHtml(m.ign)+'</td>'+
+      '<td><span class="badge" style="background:'+col+'22;color:'+col+'">'+escHtml(m.cls||'–')+'</span></td>'+
+      '<td>'+fmtK(m.cp_w1)+'</td>'+diffTd(m.cp_w1,m.cp_w2)+
+      '<td>'+fmtK(m.cp_w2)+'</td>'+diffTd(m.cp_w2,m.cp_w3)+
+      '<td class="wk3">'+fmtK(m.cp_w3)+'</td>'+
+      (manage?'<td><button class="miniedit" onclick="mngEdit('+i+')">✎</button><button class="minidel" onclick="mngDelete('+i+')">🗑</button></td>':'')+
+      '</tr>';
+  });
+  return h+'</tbody></table>';
+}
+function pageShow(id){["pick","app","manage","prog","mng"].forEach(function(x){var e=document.getElementById(x);if(e)e.classList.toggle("hidden",x!==id);});}
+function backFromPage(){pageShow("pick");renderPick();loadCounts();}
+function openProgress(){
+  pageShow("prog");
+  var b=document.getElementById("progBody");b.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
+  fetchPIG().then(function(ms){ms.sort(function(a,b){return latestWeekCP(b)-latestWeekCP(a);});b.innerHTML=buildCharTable(ms,false);})
+    .catch(function(e){b.innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
+}
+function openMng(){ if(!IS_ADMIN){toast("เฉพาะแอดมิน 🔒");return;} pageShow("mng"); loadMng(); }
+function loadMng(){
+  var b=document.getElementById("mngBody");b.innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
+  fetchPIG().then(function(ms){ms.sort(function(a,b){return latestWeekCP(b)-latestWeekCP(a);});window.__mngRows=ms;b.innerHTML=buildCharTable(ms,true);})
+    .catch(function(e){b.innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
+}
+function mngDelete(i){
+  if(!IS_ADMIN)return;
+  var m=window.__mngRows&&window.__mngRows[i];if(!m)return;
+  if(!confirm('ลบ "'+m.ign+'" ออกจากฐาน PIGROCKS? (ย้อนไม่ได้)'))return;
+  sb.from('members').delete().eq('guild','PIGROCKS').eq('ign',m.ign).select('ign').then(function(r){
+    if(r.error){toast("ลบไม่ได้: "+r.error.message);return;}
+    toast("ลบ "+m.ign+" แล้ว ✅");loadMng();
+  });
+}
+var mngEditIgn=null;
+function mngEdit(i){
+  if(!IS_ADMIN)return;
+  var m=window.__mngRows&&window.__mngRows[i];if(!m)return;
+  mngEditIgn=m.ign;
+  document.getElementById("me_ign").value=m.ign;
+  var sel=document.getElementById("me_cls");
+  sel.innerHTML='<option value="">— ไม่ระบุ —</option>'+CLASSES.map(function(c){return '<option'+(c.n===m.cls?' selected':'')+'>'+c.n+'</option>';}).join("");
+  document.getElementById("me_w1").value=m.cp_w1==null?'':m.cp_w1;
+  document.getElementById("me_w2").value=m.cp_w2==null?'':m.cp_w2;
+  document.getElementById("me_w3").value=m.cp_w3==null?'':m.cp_w3;
+  document.getElementById("me_status").textContent="";
+  document.getElementById("mngEditOv").classList.remove("hidden");
+}
+function mngEditClose(){document.getElementById("mngEditOv").classList.add("hidden");mngEditIgn=null;}
+function mngEditSave(){
+  if(!IS_ADMIN||mngEditIgn==null)return;
+  var newIgn=document.getElementById("me_ign").value.trim();
+  var cls=document.getElementById("me_cls").value;
+  var gv=function(id){var v=document.getElementById(id).value.trim();return v===''?null:(parseInt(v,10)||0);};
+  var w1=gv("me_w1"),w2=gv("me_w2"),w3=gv("me_w3");
+  if(!newIgn){toast("ใส่ชื่อก่อน");return;}
+  var rec={ign:newIgn,cls:cls,cp_w1:w1,cp_w2:w2,cp_w3:w3};
+  var latest=w3!=null?w3:w2!=null?w2:w1;
+  if(latest!=null)rec.cp=latest;
+  document.getElementById("me_status").textContent="กำลังบันทึก...";
+  sb.from('members').update(rec).eq('guild','PIGROCKS').eq('ign',mngEditIgn).select('ign').then(function(r){
+    if(r.error){document.getElementById("me_status").textContent="บันทึกไม่ได้: "+r.error.message;return;}
+    toast("บันทึกแล้ว ✅");mngEditClose();loadMng();
+  });
+}
 
 /* init */
 renderPick();loadCounts();
