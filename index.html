@@ -990,29 +990,9 @@ function renderPool(){
   document.getElementById("poolCount").textContent=pool.length+" รอจัด • "+assigned.length+" จัดแล้ว";
   document.getElementById("poolHint").classList.toggle("hidden",!IS_ADMIN);
   if(!pool.length&&!assigned.length){list.innerHTML='<div class="poolempty">— ยังไม่มีคนในลิสต์ —</div>';return;}
-  const byG={},solo=[];
-  pool.forEach(m=>{const k=groupKey(m);if(k===null)solo.push(m);else(byG[k]=byG[k]||[]).push(m)});
-  const groups=Object.entries(byG).map(([k,arr])=>{
-    arr.sort((a,b)=>(b.isLeader?1:0)-(a.isLeader?1:0)||cmp(a,b));
-    return {k:+k,arr,sortv:arr[0]};
-  });
-  groups.sort((a,b)=>cmp(a.sortv,b.sortv));
-  solo.sort(cmp);
-  groups.forEach(({k,arr})=>{
-    const col=groupColor(arr[0]);const tot=arr.reduce((s,m)=>s+m.cp,0);
-    const lead=memberById(k);
-    const card=document.createElement("div");card.className="grpcard";card.style.borderLeftColor=col;
-    const h=document.createElement("div");h.className="grphead";
-    h.innerHTML=`<span class="crown">👑</span><span class="lead" style="color:${col}">${lead?lead.ign:"ปาตี้"}</span>
-      <span class="gc">${arr.length} คน • ${(tot/1000).toFixed(0)}k</span>`;
-    card.appendChild(h);
-    arr.forEach(m=>card.appendChild(memberEl(m,IS_ADMIN)));
-    list.appendChild(card);
-  });
-  if(solo.length){
-    if(groups.length){const sh=document.createElement("div");sh.className="subhead";sh.textContent="มาคนเดียว / ไม่มีก๊วน";list.appendChild(sh);}
-    solo.forEach(m=>list.appendChild(memberEl(m,IS_ADMIN)));
-  }
+  // เรียงแบบเรียบเดียวตามแท็บที่เลือก (CP / ชื่อ / อาชีพ) ไม่จัดกลุ่มตามปาตี้/ก๊วนแล้ว
+  pool.sort(cmp);
+  pool.forEach(m=>list.appendChild(memberEl(m,IS_ADMIN)));
   if(assigned.length){
     const sh2=document.createElement("div");sh2.className="subhead";sh2.textContent="จัดตี้แล้ว";list.appendChild(sh2);
     assigned.forEach(m=>{const el=memberEl(m,false);const pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.party+1);el.appendChild(pb);list.appendChild(el);});
