@@ -940,18 +940,14 @@ function dropTo(pi,si){
   if(!IS_ADMIN||dragId==null)return;const g=G();
   const m=memberById(dragId);if(!m)return;
   const p=g.parties[pi];
-  // ถ้าเป็นก๊วนเดียวกัน ลากไปพร้อมกันทั้งก๊วน
-  const k=groupKey(m);
-  const grp=k===null?[m]:g.members.filter(x=>groupKey(x)===k);
-  grp.forEach(x=>{if(x.party>=0){g.parties[x.party][x.slot]=null;x.party=-1;x.slot=-1;}});
-  const order=[m,...grp.filter(x=>x!==m).sort((a,b)=>b.cp-a.cp)];
-  const slots=[];
-  if(!p[si])slots.push(si);
-  for(let s=0;s<SLOTS;s++)if(s!==si&&!p[s])slots.push(s);
-  let placed=0;
-  order.forEach(x=>{if(placed<slots.length){const s=slots[placed++];p[s]=x;x.party=pi;x.slot=s;}});
-  dragId=null;buildParties();renderPool();persist();
-  if(placed<order.length)toast("ที่ในปาตี้ไม่พอ วางได้ "+placed+"/"+order.length+" คน");
+  // ลากทีละคน ไม่ยกทั้งก๊วนอีกต่อไป
+  if(m.party>=0){g.parties[m.party][m.slot]=null;m.party=-1;m.slot=-1;}
+  let s=si;
+  if(p[s]){s=-1;for(let i=0;i<SLOTS;i++){if(!p[i]){s=i;break;}}}
+  dragId=null;
+  if(s===-1){buildParties();renderPool();persist();toast("ปาตี้นี้เต็มแล้ว");return;}
+  p[s]=m;m.party=pi;m.slot=s;
+  buildParties();renderPool();persist();
 }
 function clearBoard(){
   if(!confirm("ล้างการจัดปาตี้ทั้งหมดของกิลด์นี้? (บันทึกทันที ย้อนไม่ได้)"))return;
@@ -1198,15 +1194,15 @@ function finishArr(mode,msg){
   toast(msg);
 }
 function placeGroup(id,pi,si){
+  // ชื่อฟังก์ชันเดิมคงไว้เพื่อความเข้ากันได้ แต่วางทีละคน ไม่ยกทั้งก๊วนอีกต่อไป
   const g=G();const m=memberById(id);if(!m)return;
-  const p=g.parties[pi];const k=groupKey(m);
-  const grp=k===null?[m]:g.members.filter(x=>groupKey(x)===k);
-  grp.forEach(x=>{if(x.party>=0){g.parties[x.party][x.slot]=null;x.party=-1;x.slot=-1;}});
-  const order=[m,...grp.filter(x=>x!==m).sort((a,b)=>b.cp-a.cp)];
-  const slots=[];if(!p[si])slots.push(si);for(let s=0;s<SLOTS;s++)if(s!==si&&!p[s])slots.push(s);
-  let placed=0;order.forEach(x=>{if(placed<slots.length){const s=slots[placed++];p[s]=x;x.party=pi;x.slot=s;}});
+  const p=g.parties[pi];
+  if(m.party>=0){g.parties[m.party][m.slot]=null;m.party=-1;m.slot=-1;}
+  let s=si;
+  if(p[s]){s=-1;for(let i=0;i<SLOTS;i++){if(!p[i]){s=i;break;}}}
+  if(s===-1){buildParties();renderPool();if(typeof persist==="function")persist();toast("ปาตี้นี้เต็มแล้ว");return;}
+  p[s]=m;m.party=pi;m.slot=s;
   buildParties();renderPool();if(typeof persist==="function")persist();
-  if(placed<order.length)toast("ที่ในปาตี้ไม่พอ วางได้ "+placed+"/"+order.length+" คน");
 }
 function tapPlace(pi,si){if(!IS_ADMIN||selectedId==null)return;const id=selectedId;selectedId=null;placeGroup(id,pi,si);}
 function selectMember(id){selectedId=(selectedId===id?null:id);renderPool();if(selectedId!=null)toast("เลือกแล้ว — แตะช่องว่างในปาตี้เพื่อวาง");}
