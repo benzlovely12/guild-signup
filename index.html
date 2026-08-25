@@ -26,6 +26,7 @@
   .toolbtn:hover{border-color:var(--g)}
   .toolbtn.g{background:var(--g);border:none;color:#111}
   .badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:800;white-space:nowrap}
+  .clsdot{display:inline-block;width:10px;height:10px;min-width:10px;border-radius:50%;flex:none}
 
   /* Guild select */
   #pick{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px 30px 46px}
@@ -923,7 +924,7 @@ function renderSlot(slot,m){
   if(m){
     if(isAbsent(m))slot.classList.add("absent");else slot.classList.remove("absent");
     slot.style.borderLeftColor=groupColor(m);
-    slot.innerHTML=`${IS_ADMIN?`<input type="checkbox" class="attend" ${isAbsent(m)?"":"checked"} title="ติ๊ก = มา / เอาออก = ไม่มา">`:""}<span class="badge" style="background:${classColor(m.cls)}22;color:${classColor(m.cls)}">${m.cls}</span>
+    slot.innerHTML=`${IS_ADMIN?`<input type="checkbox" class="attend" ${isAbsent(m)?"":"checked"} title="ติ๊ก = มา / เอาออก = ไม่มา">`:""}<span class="clsdot" style="background:${classColor(m.cls)}" title="${m.cls}"></span>
       <span class="nm">${m.isLeader?"👑":""}${m.ign}</span><span class="scp">${(m.cp/1000).toFixed(0)}k</span>
       ${IS_ADMIN?'<button class="x">✕</button>':""}`;
     const cb=slot.querySelector(".attend");
@@ -974,7 +975,7 @@ function memberEl(m,drag){
   const absent=isAbsent(m);
   const el=document.createElement("div");el.className="member"+(drag?" drag":"")+(absent?" absent":"");el.draggable=!!drag;
   el.style.borderLeftColor=groupColor(m);
-  el.innerHTML=`<span class="badge" style="background:${classColor(m.cls)}22;color:${classColor(m.cls)}">${m.cls}</span>
+  el.innerHTML=`<span class="clsdot" style="background:${classColor(m.cls)}" title="${m.cls}"></span>
     ${m.isLeader?'<span class="crown">👑</span>':""}<span class="nm">${m.ign}</span>
     <span class="meta"><b>${(m.cp/1000).toFixed(0)}k</b></span>`;
   if(drag){el.addEventListener("dragstart",()=>{dragId=m.id;el.classList.add("dragging")});el.addEventListener("dragend",()=>el.classList.remove("dragging"));el.addEventListener("click",()=>selectMember(m.id));if(m.id===selectedId){el.style.outline="2px solid var(--g)";el.style.outlineOffset="1px";}}
