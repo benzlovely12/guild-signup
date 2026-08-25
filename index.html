@@ -975,7 +975,7 @@ function memberEl(m,drag){
   const absent=isAbsent(m);
   const el=document.createElement("div");el.className="member"+(drag?" drag":"")+(absent?" absent":"");el.draggable=!!drag;
   el.style.borderLeftColor=groupColor(m);
-  el.innerHTML=`<span class="clsdot" style="background:${classColor(m.cls)}" title="${m.cls}"></span>
+  el.innerHTML=`<span class="badge" style="background:${classColor(m.cls)}22;color:${classColor(m.cls)}">${m.cls}</span>
     ${m.isLeader?'<span class="crown">👑</span>':""}<span class="nm">${m.ign}</span>
     <span class="meta"><b>${(m.cp/1000).toFixed(0)}k</b></span>`;
   if(drag){el.addEventListener("dragstart",()=>{dragId=m.id;el.classList.add("dragging")});el.addEventListener("dragend",()=>el.classList.remove("dragging"));el.addEventListener("click",()=>selectMember(m.id));if(m.id===selectedId){el.style.outline="2px solid var(--g)";el.style.outlineOffset="1px";}}
