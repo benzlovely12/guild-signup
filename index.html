@@ -473,6 +473,45 @@
   </div>
 </div>
 
+<!-- ===== หน้า ศึกชิงปราสาท (PIGROCKS) — หน้าตาแบบเดียวกับ GvG ลีค ===== -->
+<div id="castle" class="hidden">
+  <header class="top">
+    <div class="glogo">🏰</div>
+    <div>
+      <div class="gname">PIGROCKS — ศึกชิงปราสาท</div>
+      <div class="gmeta">แบ่งทีมตามหน้าที่ • จัดเอง (ไม่มีระบบอัตโนมัติ)</div>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="adminbadge hidden" id="castleAdminBadge">โหมดแอดมิน — จัดปาตี้ได้</span>
+      <span class="memberbadge hidden" id="castleMemberBadge">โหมดสมาชิก — ดูอย่างเดียว</span>
+      <button class="toolbtn" onclick="backFromPage()">↩ ย้อนกลับ</button>
+    </div>
+  </header>
+  <div class="bottom">
+    <div class="boardcol">
+      <div class="board-head">
+        <h3>รายชื่อปาตี้ — ศึกชิงปราสาท</h3>
+        <span class="gmeta">ปาตี้ละ 5 • 30 ปาตี้</span>
+        <div id="castleAdminTools" class="hidden" style="margin-left:auto;display:flex;gap:8px">
+          <button class="toolbtn" onclick="castleClearAll()">🧹 ล้าง</button>
+        </div>
+      </div>
+      <div class="parties" id="castleParties"></div>
+    </div>
+    <div class="pool">
+      <h3>รายชื่อที่ลงทะเบียน <small id="castlePoolCount">0</small></h3>
+      <div class="hint" id="castlePoolHint">👑 = หัวปาตี้</div>
+      <div class="search"><input id="castleSearch" placeholder="ค้นหาชื่อ/อาชีพ..." oninput="renderCastlePool()"></div>
+      <div class="sorts">
+        <button class="chip on" data-cs="cp" onclick="setCastleSort('cp')">CP</button>
+        <button class="chip" data-cs="name" onclick="setCastleSort('name')">ชื่อ A→Z</button>
+        <button class="chip" data-cs="class" onclick="setCastleSort('class')">อาชีพ</button>
+      </div>
+      <div class="poollist" id="castlePoollist"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== APP ===== -->
 <div id="app" class="hidden" data-mtab="party">
   <img id="gcover" class="gcover" alt="cover">
@@ -670,15 +709,22 @@ function leaderName(id){const m=memberById(id);return m?m.ign:"?"}
 /* ---------- guild select ---------- */
 function renderPick(){
   const box=document.getElementById("gcards");box.innerHTML="";
-  // 1) การ์ดกิลด์ PIGROCKS (เหลือกิลด์เดียว)
+  // 1) การ์ดกิลด์ PIGROCKS แยกเป็น 2 โหมด: GvG ลีค กับ ศึกชิงปราสาท
   const g=GUILDS[0];
-  const el=document.createElement("div");el.className="gcard";el.style.setProperty("--gc",g.color);
   const ic=g.img&&!g.img.startsWith("__")?`<img src="${g.img}" alt="${g.key}">`:g.logo;
+  const cnt=(g._count!=null?g._count:g.members.length)+" คนลงทะเบียน";
+  const el=document.createElement("div");el.className="gcard";el.style.setProperty("--gc",g.color);
   el.innerHTML=`<div class="no">#1</div><div class="lg">${ic}</div>
-    <h2>${g.key}</h2><div class="tag">${g.tag}</div>
-    <div class="cnt">${g._count!=null?g._count:g.members.length} คนลงทะเบียน</div><div class="go">กดเพื่อเข้า →</div>`;
+    <h2>${g.key} - GvG ลีค</h2><div class="tag">แบ่งห้องบนและห้องล่าง</div>
+    <div class="cnt">${cnt}</div><div class="go">กดเพื่อเข้า →</div>`;
   el.onclick=()=>openGuild(0);
   box.appendChild(el);
+  const cs=document.createElement("div");cs.className="gcard";cs.style.setProperty("--gc","#ff9d4d");
+  cs.innerHTML=`<div class="no">🏰</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:#2a1a10">🏰</div>
+    <h2>${g.key} - ศึกชิงปราสาท</h2><div class="tag">แบ่งทีมตามหน้าที่</div>
+    <div class="cnt">${cnt}</div><div class="go">กดเพื่อเข้า →</div>`;
+  cs.onclick=openCastle;
+  box.appendChild(cs);
   // 2) การ์ด การพัฒนาตัวละคร (ดูอย่างเดียว ทุกคนเข้าได้)
   const p=document.createElement("div");p.className="gcard";p.style.setProperty("--gc","#4fd8ff");
   p.innerHTML='<div class="no">📈</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:#0c2733">📈</div>'+
@@ -1903,7 +1949,7 @@ function renderCharTable(rows,manage,container){
   CT={rows:rows,manage:manage,container:container,key:'latest',dir:'desc'};
   renderCT();
 }
-function pageShow(id){["pick","app","manage","prog","mng"].forEach(function(x){var e=document.getElementById(x);if(e)e.classList.toggle("hidden",x!==id);});}
+function pageShow(id){["pick","app","manage","prog","mng","castle"].forEach(function(x){var e=document.getElementById(x);if(e)e.classList.toggle("hidden",x!==id);});}
 function backFromPage(){pageShow("pick");renderPick();loadCounts();}
 function openProgress(){
   pageShow("prog");
@@ -1957,6 +2003,178 @@ function mngEditSave(){
     toast("บันทึกแล้ว ✅");mngEditClose();loadMng();
   });
 }
+
+/* ===== หน้า ศึกชิงปราสาท (PIGROCKS) — บอร์ดปาตี้แบบเดียวกับ GvG ลีคเป๊ะๆ ====
+   ห้องบน กลุ่มละ 3 ปาตี้ (A-D) + ห้องล่าง กลุ่มละ 6 ปาตี้ (E-G) รวม 30 ปาตี้ ปาตี้ละ 5 คน
+   ใช้รายชื่อชุดเดียวกับ GvG (fetchPIG) แต่เก็บตำแหน่งแยกคนละคอลัมน์ (castle_party/castle_slot)
+   จัดเอง (ลาก/กดเลือกแล้วแตะช่อง) ไม่มีปุ่มจัดอัตโนมัติ ============================= */
+var CASTLE={rows:[],parties:[],sortBy:'cp'};
+var castleDragId=null,castleSelectedId=null;
+function openCastle(){
+  pageShow("castle");
+  document.getElementById("castleAdminBadge").classList.toggle("hidden",!IS_ADMIN);
+  document.getElementById("castleMemberBadge").classList.toggle("hidden",IS_ADMIN);
+  document.getElementById("castleAdminTools").classList.toggle("hidden",!IS_ADMIN);
+  document.getElementById("castlePoolHint").classList.toggle("hidden",!IS_ADMIN);
+  loadCastle();
+}
+function loadCastle(){
+  document.getElementById("castleParties").innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
+  fetchPIG().then(function(ms){CASTLE.rows=ms;rebuildCastleParties();renderCastle();})
+    .catch(function(e){document.getElementById("castleParties").innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
+}
+function rebuildCastleParties(){
+  var P=[];for(var i=0;i<PARTY_COUNT;i++){var row=[];for(var s=0;s<SLOTS;s++)row.push(null);P.push(row);}
+  CASTLE.rows.forEach(function(m){
+    var pi=m.castle_party,si=m.castle_slot;
+    if(pi!=null&&si!=null&&pi>=0&&si>=0&&pi<PARTY_COUNT&&si<SLOTS&&!P[pi][si]){P[pi][si]=m;}
+    else{m.castle_party=-1;m.castle_slot=-1;}
+  });
+  CASTLE.parties=P;
+}
+function castleSumCP(from,to){var s=0;for(var pi=from;pi<to;pi++)CASTLE.parties[pi].forEach(function(m){if(m)s+=m.cp;});return s;}
+function castleMemberByIgn(ign){return CASTLE.rows.find(function(x){return x.ign===ign;});}
+function renderCastleSlot(slot,m){
+  if(m){
+    slot.style.borderLeftColor=classColor(m.cls);
+    slot.innerHTML='<span class="clsdot" style="background:'+classColor(m.cls)+'" title="'+escHtml(m.cls||'')+'"></span>'+
+      '<span class="nm">'+(m.is_leader?"👑":"")+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>'+
+      (IS_ADMIN?'<button class="x">✕</button>':"");
+    var x=slot.querySelector(".x");
+    if(x)x.onclick=function(e){e.stopPropagation();castleRemove(m.ign);};
+  }else{
+    slot.style.borderLeftColor="#38416a";
+    slot.innerHTML='<span class="empty-t">— ว่าง —</span>';
+  }
+}
+function castleMakeParty(pi){
+  var p=CASTLE.parties[pi];
+  var cp=p.reduce(function(s,m){return s+(m?m.cp:0);},0);
+  var el=document.createElement("div");el.className="party";
+  el.innerHTML='<h4><span class="pname">ปาตี้ '+(pi+1)+'</span><span class="cp">'+(cp/1000).toFixed(0)+'k</span></h4>';
+  for(var si=0;si<SLOTS;si++){
+    var slot=document.createElement("div");slot.className="slot";slot.dataset.p=pi;slot.dataset.s=si;
+    renderCastleSlot(slot,p[si]);
+    if(IS_ADMIN){
+      slot.addEventListener("dragover",function(e){e.preventDefault();this.classList.add("over");});
+      slot.addEventListener("dragleave",function(){this.classList.remove("over");});
+      slot.addEventListener("drop",(function(pi,si){return function(e){e.preventDefault();this.classList.remove("over");castleDropTo(pi,si);};})(pi,si));
+      slot.addEventListener("click",(function(pi,si){return function(){if(castleSelectedId!=null)castleTapPlace(pi,si);};})(pi,si));
+    }
+    el.appendChild(slot);
+  }
+  return el;
+}
+function castleMakeGroupBox(letter,color,from,to){
+  var gb=document.createElement("div");gb.className="groupbox";gb.style.setProperty("--gc",color);
+  var lab=document.createElement("div");lab.className="glabel";lab.style.color=color;
+  lab.innerHTML='กลุ่ม '+letter+'<span class="gcp">'+(castleSumCP(from,to)/1000).toFixed(0)+'k</span>';
+  gb.appendChild(lab);
+  var gp=document.createElement("div");gp.className="gparties";
+  for(var pi=from;pi<to;pi++)gp.appendChild(castleMakeParty(pi));
+  gb.appendChild(gp);
+  return gb;
+}
+function renderCastleBoard(){
+  var box=document.getElementById("castleParties");box.innerHTML="";
+  var nUp=Math.max(1,Math.floor(UPPER_PARTIES/3));
+  var upRoom=document.createElement("div");upRoom.className="room";
+  upRoom.innerHTML='<div class="room-title">🔺 ห้องบน — แข่งกลุ่ม '+GROUP_LETTERS.slice(0,nUp).join(" · ")+'</div>';
+  var g4=document.createElement("div");g4.className="groups4";
+  for(var gi=0;gi<nUp;gi++){
+    var from=gi*3,to=Math.min(from+3,UPPER_PARTIES);
+    g4.appendChild(castleMakeGroupBox(GROUP_LETTERS[gi],GROUP_COLORS[gi]||"#888",from,to));
+  }
+  upRoom.appendChild(g4);box.appendChild(upRoom);
+  if(PARTY_COUNT>UPPER_PARTIES){
+    var nLo=Math.ceil((PARTY_COUNT-UPPER_PARTIES)/6);
+    var letters=[];for(var i=0;i<nLo;i++)letters.push(GROUP_LETTERS[nUp+i]);
+    var loRoom=document.createElement("div");loRoom.className="room";
+    loRoom.innerHTML='<div class="room-title">🔻 ห้องล่าง — กลุ่ม '+letters.join(" · ")+' (กลุ่มละ 6 ตี้)</div>';
+    var g4l=document.createElement("div");g4l.className="groups4";
+    for(var gi2=0;gi2<nLo;gi2++){
+      var from2=UPPER_PARTIES+gi2*6,to2=Math.min(from2+6,PARTY_COUNT);
+      g4l.appendChild(castleMakeGroupBox(GROUP_LETTERS[nUp+gi2],GROUP_COLORS[nUp+gi2]||"#888",from2,to2));
+    }
+    loRoom.appendChild(g4l);box.appendChild(loRoom);
+  }
+}
+function castleCmp(a,b){return CASTLE.sortBy==="cp"?b.cp-a.cp:CASTLE.sortBy==="name"?a.ign.localeCompare(b.ign):(a.cls||'').localeCompare(b.cls||'')||b.cp-a.cp;}
+function setCastleSort(s){CASTLE.sortBy=s;document.querySelectorAll('.chip[data-cs]').forEach(function(c){c.classList.toggle('on',c.dataset.cs===s);});renderCastlePool();}
+function castleMemberEl(m,drag){
+  var el=document.createElement("div");el.className="member"+(drag?" drag":"");el.draggable=!!drag;
+  el.innerHTML='<span class="badge" style="background:'+classColor(m.cls)+'22;color:'+classColor(m.cls)+'">'+escHtml(m.cls||'')+'</span>'+
+    (m.is_leader?'<span class="crown">👑</span>':'')+'<span class="nm">'+escHtml(m.ign)+'</span>'+
+    '<span class="meta"><b>'+(m.cp/1000).toFixed(0)+'k</b></span>';
+  if(drag){
+    el.addEventListener("dragstart",function(){castleDragId=m.ign;el.classList.add("dragging");});
+    el.addEventListener("dragend",function(){el.classList.remove("dragging");});
+    el.addEventListener("click",function(e){e.stopPropagation();castleSelectedId=(castleSelectedId===m.ign?null:m.ign);renderCastlePool();if(castleSelectedId!=null)toast("เลือกแล้ว — แตะช่องปาตี้ที่จะวาง");});
+    if(m.ign===castleSelectedId){el.style.outline="2px solid var(--g)";el.style.outlineOffset="1px";}
+  }
+  return el;
+}
+function castlePersistOne(m){
+  sb.from('members').update({castle_party:m.castle_party,castle_slot:m.castle_slot}).eq('guild','PIGROCKS').eq('ign',m.ign).then(function(r){
+    if(r.error)toast("บันทึกไม่ได้: "+r.error.message);
+  });
+}
+function castleDropTo(pi,si){
+  if(!IS_ADMIN||castleDragId==null)return;
+  var m=castleMemberByIgn(castleDragId);castleDragId=null;
+  if(!m)return;
+  var P=CASTLE.parties;
+  if(m.castle_party>=0)P[m.castle_party][m.castle_slot]=null;
+  var s=si;
+  if(P[pi][s]){s=-1;for(var i=0;i<SLOTS;i++){if(!P[pi][i]){s=i;break;}}}
+  if(s===-1){renderCastleBoard();renderCastlePool();toast("ปาตี้นี้เต็มแล้ว");return;}
+  P[pi][s]=m;m.castle_party=pi;m.castle_slot=s;
+  renderCastleBoard();renderCastlePool();castlePersistOne(m);
+}
+function castleTapPlace(pi,si){
+  if(!IS_ADMIN||castleSelectedId==null)return;
+  var id=castleSelectedId;castleSelectedId=null;castleDragId=id;castleDropTo(pi,si);
+}
+function castleRemove(ign){
+  if(!IS_ADMIN)return;
+  var m=castleMemberByIgn(ign);if(!m)return;
+  if(m.castle_party>=0)CASTLE.parties[m.castle_party][m.castle_slot]=null;
+  m.castle_party=-1;m.castle_slot=-1;
+  renderCastleBoard();renderCastlePool();castlePersistOne(m);
+}
+function renderCastlePool(){
+  var q=(document.getElementById("castleSearch").value||"").toLowerCase();
+  var match=function(m){return !q||m.ign.toLowerCase().includes(q)||(m.cls||'').toLowerCase().includes(q);};
+  var pool=CASTLE.rows.filter(function(m){return m.castle_party==null||m.castle_party<0;}).filter(match).sort(castleCmp);
+  var assigned=CASTLE.rows.filter(function(m){return m.castle_party!=null&&m.castle_party>=0;}).filter(match).sort(function(a,b){return a.castle_party-b.castle_party||a.castle_slot-b.castle_slot;});
+  var list=document.getElementById("castlePoollist");list.innerHTML="";
+  document.getElementById("castlePoolCount").textContent=pool.length+" รอจัด • "+assigned.length+" จัดแล้ว";
+  if(!pool.length&&!assigned.length){list.innerHTML='<div class="poolempty">— ยังไม่มีคนในลิสต์ —</div>';return;}
+  pool.forEach(function(m){list.appendChild(castleMemberEl(m,IS_ADMIN));});
+  if(assigned.length){
+    var sh=document.createElement("div");sh.className="subhead";sh.textContent="จัดตี้แล้ว";list.appendChild(sh);
+    assigned.forEach(function(m){
+      var el=castleMemberEl(m,false);
+      var pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.castle_party+1);el.appendChild(pb);
+      list.appendChild(el);
+    });
+  }
+  if(IS_ADMIN){
+    list.ondragover=function(e){e.preventDefault();};
+    list.ondrop=function(e){e.preventDefault();if(castleDragId!=null)castleRemove(castleDragId);castleDragId=null;};
+  }
+}
+function castleClearAll(){
+  if(!IS_ADMIN)return;
+  if(!confirm("ล้างการจัดปาตี้ศึกชิงปราสาททั้งหมด? (บันทึกทันที ย้อนไม่ได้)"))return;
+  sb.from('members').update({castle_party:-1,castle_slot:-1}).eq('guild','PIGROCKS').then(function(r){
+    if(r.error){toast("ล้างไม่ได้: "+r.error.message);return;}
+    CASTLE.rows.forEach(function(m){m.castle_party=-1;m.castle_slot=-1;});
+    rebuildCastleParties();renderCastle();
+    toast("ล้างแล้ว");
+  });
+}
+function renderCastle(){renderCastleBoard();renderCastlePool();}
 
 /* init */
 renderPick();loadCounts();
