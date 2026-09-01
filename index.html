@@ -512,6 +512,7 @@
         <button class="chip on" data-cs="cp" onclick="setCastleSort('cp')">CP</button>
         <button class="chip" data-cs="name" onclick="setCastleSort('name')">ชื่อ A→Z</button>
         <button class="chip" data-cs="class" onclick="setCastleSort('class')">อาชีพ</button>
+        <button class="chip" data-cs="party" onclick="setCastleSort('party')">ปาตี้</button>
       </div>
       <div class="poollist" id="castlePoollist"></div>
     </div>
@@ -633,6 +634,7 @@
         <button class="chip on" data-s="cp" onclick="setSort('cp')">CP</button>
         <button class="chip" data-s="name" onclick="setSort('name')">ชื่อ A→Z</button>
         <button class="chip" data-s="class" onclick="setSort('class')">อาชีพ</button>
+        <button class="chip" data-s="party" onclick="setSort('party')">ปาตี้</button>
       </div>
       <div class="poollist" id="poollist"></div>
     </div>
@@ -1020,7 +1022,7 @@ function clearBoard(){
 
 /* ---------- pool (grouped, sortable) ---------- */
 function setSort(s){sortBy=s;document.querySelectorAll(".chip[data-s]").forEach(c=>c.classList.toggle("on",c.dataset.s===s));renderPool()}
-function cmp(a,b){return sortBy==="cp"?b.cp-a.cp:sortBy==="name"?a.ign.localeCompare(b.ign):a.cls.localeCompare(b.cls)||b.cp-a.cp}
+function cmp(a,b){return sortBy==="cp"||sortBy==="party"?b.cp-a.cp:sortBy==="name"?a.ign.localeCompare(b.ign):a.cls.localeCompare(b.cls)||b.cp-a.cp}
 /* ---------- เช็คชื่อ มา/ไม่มา (เก็บในเครื่องนี้ ต่อกิลด์) ---------- */
 let _absent=new Set();
 function attendKey(){return "attend_"+G().key;}
@@ -1054,10 +1056,18 @@ function renderPool(){
   if(!pool.length&&!assigned.length){list.innerHTML='<div class="poolempty">— ยังไม่มีคนในลิสต์ —</div>';return;}
   // เรียงแบบเรียบเดียวตามแท็บที่เลือก (CP / ชื่อ / อาชีพ) ไม่จัดกลุ่มตามปาตี้/ก๊วนแล้ว
   pool.sort(cmp);
-  pool.forEach(m=>list.appendChild(memberEl(m,IS_ADMIN)));
-  if(assigned.length){
+  function addAssigned(){
+    if(!assigned.length)return;
     const sh2=document.createElement("div");sh2.className="subhead";sh2.textContent="จัดตี้แล้ว";list.appendChild(sh2);
     assigned.forEach(m=>{const el=memberEl(m,false);const pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.party+1);el.appendChild(pb);list.appendChild(el);});
+  }
+  function addPool(){pool.forEach(m=>list.appendChild(memberEl(m,IS_ADMIN)));}
+  if(sortBy==="party"){
+    addAssigned();
+    if(pool.length){const sh1=document.createElement("div");sh1.className="subhead";sh1.textContent="ยังไม่จัด";list.appendChild(sh1);addPool();}
+  }else{
+    addPool();
+    addAssigned();
   }
   if(IS_ADMIN){
     list.ondragover=e=>e.preventDefault();
@@ -2124,7 +2134,7 @@ function renderCastleBoard(){
     loRoom.appendChild(g4l);box.appendChild(loRoom);
   }
 }
-function castleCmp(a,b){return CASTLE.sortBy==="cp"?b.cp-a.cp:CASTLE.sortBy==="name"?a.ign.localeCompare(b.ign):(a.cls||'').localeCompare(b.cls||'')||b.cp-a.cp;}
+function castleCmp(a,b){return CASTLE.sortBy==="cp"||CASTLE.sortBy==="party"?b.cp-a.cp:CASTLE.sortBy==="name"?a.ign.localeCompare(b.ign):(a.cls||'').localeCompare(b.cls||'')||b.cp-a.cp;}
 function setCastleSort(s){CASTLE.sortBy=s;document.querySelectorAll('.chip[data-cs]').forEach(function(c){c.classList.toggle('on',c.dataset.cs===s);});renderCastlePool();}
 function castleMemberEl(m,drag){
   var el=document.createElement("div");el.className="member"+(drag?" drag":"");el.draggable=!!drag;
@@ -2175,14 +2185,22 @@ function renderCastlePool(){
   var list=document.getElementById("castlePoollist");list.innerHTML="";
   document.getElementById("castlePoolCount").textContent=pool.length+" รอจัด • "+assigned.length+" จัดแล้ว";
   if(!pool.length&&!assigned.length){list.innerHTML='<div class="poolempty">— ยังไม่มีคนในลิสต์ —</div>';return;}
-  pool.forEach(function(m){list.appendChild(castleMemberEl(m,IS_ADMIN));});
-  if(assigned.length){
+  function addCastleAssigned(){
+    if(!assigned.length)return;
     var sh=document.createElement("div");sh.className="subhead";sh.textContent="จัดตี้แล้ว";list.appendChild(sh);
     assigned.forEach(function(m){
       var el=castleMemberEl(m,false);
       var pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.castle_party+1);el.appendChild(pb);
       list.appendChild(el);
     });
+  }
+  function addCastlePool(){pool.forEach(function(m){list.appendChild(castleMemberEl(m,IS_ADMIN));});}
+  if(CASTLE.sortBy==="party"){
+    addCastleAssigned();
+    if(pool.length){var sh1=document.createElement("div");sh1.className="subhead";sh1.textContent="ยังไม่จัด";list.appendChild(sh1);addCastlePool();}
+  }else{
+    addCastlePool();
+    addCastleAssigned();
   }
   if(IS_ADMIN){
     list.ondragover=function(e){e.preventDefault();};
