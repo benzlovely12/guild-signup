@@ -619,9 +619,7 @@
         <h3>รายชื่อปาตี้ — Party Board</h3>
         <span class="gmeta">ปาตี้ละ 5 • 30 ปาตี้</span>
         <div id="adminTools" class="hidden" style="margin-left:auto;display:flex;gap:8px">
-          <button class="toolbtn g" onclick="autoArrange()">⚡ จัดปาตี้อัตโนมัติ</button>
           <button class="toolbtn" onclick="clearBoard()">🧹 ล้าง</button>
-          <button class="toolbtn" onclick="announceDiscord()">📢 Discord</button>
         </div>
       </div>
       <div class="parties" id="parties"></div>
@@ -2046,12 +2044,26 @@ function rebuildCastleParties(){
 }
 function castleSumCP(from,to){var s=0;for(var pi=from;pi<to;pi++)CASTLE.parties[pi].forEach(function(m){if(m)s+=m.cp;});return s;}
 function castleMemberByIgn(ign){return CASTLE.rows.find(function(x){return x.ign===ign;});}
+/* เช็คชื่อ มา/ไม่มา ของศึกชิงปราสาท — เก็บแยกจาก GvG (คนละคีย์) */
+var _castleAbsent=new Set();
+function castleAttendKey(){return "attend_castle_PIGROCKS";}
+function loadCastleAbsent(){try{_castleAbsent=new Set(JSON.parse(localStorage.getItem(castleAttendKey())||"[]"));}catch(e){_castleAbsent=new Set();}}
+function isCastleAbsent(m){return _castleAbsent.has(String(m.ign).toLowerCase());}
+function toggleCastleAttend(ign){
+  var k=String(ign).toLowerCase();
+  if(_castleAbsent.has(k))_castleAbsent.delete(k);else _castleAbsent.add(k);
+  try{localStorage.setItem(castleAttendKey(),JSON.stringify([..._castleAbsent]));}catch(e){}
+  renderCastleBoard();
+}
 function renderCastleSlot(slot,m){
   if(m){
+    if(isCastleAbsent(m))slot.classList.add("absent");else slot.classList.remove("absent");
     slot.style.borderLeftColor=classColor(m.cls);
-    slot.innerHTML=clsDotHtml(m.cls)+
+    slot.innerHTML=(IS_ADMIN?'<input type="checkbox" class="attend" '+(isCastleAbsent(m)?"":"checked")+' title="ติ๊ก = มา / เอาออก = ไม่มา">':"")+clsDotHtml(m.cls)+
       '<span class="nm">'+(m.is_leader?"👑":"")+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>'+
       (IS_ADMIN?'<button class="x">✕</button>':"");
+    var cb=slot.querySelector(".attend");
+    if(cb){cb.addEventListener("click",function(e){e.stopPropagation();});cb.addEventListener("change",function(e){e.stopPropagation();toggleCastleAttend(m.ign);});}
     var x=slot.querySelector(".x");
     if(x)x.onclick=function(e){e.stopPropagation();castleRemove(m.ign);};
   }else{
@@ -2088,6 +2100,7 @@ function castleMakeGroupBox(letter,color,from,to){
   return gb;
 }
 function renderCastleBoard(){
+  loadCastleAbsent();
   var box=document.getElementById("castleParties");box.innerHTML="";
   var nUp=Math.max(1,Math.floor(UPPER_PARTIES/3));
   var upRoom=document.createElement("div");upRoom.className="room";
