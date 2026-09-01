@@ -100,6 +100,7 @@
   .slot{display:flex;align-items:center;gap:8px;background:var(--slot);border:1px dashed #38416a;border-radius:8px;padding:6px 8px;margin-bottom:6px;min-height:40px;border-left-width:4px}
   .slot:last-child{margin-bottom:0}
   .slot.over{background:#26406e;border-color:var(--g);border-style:solid}
+  .party.over{outline:2px solid var(--g);outline-offset:-1px}
   .slot .nm{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .slot .scp{margin-left:auto;color:var(--gold);font-weight:800;font-size:11px}
   .slot .x{margin-left:3px;color:var(--muted);border:none;background:none;font-size:13px}
@@ -119,6 +120,11 @@
   .member{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 9px;margin-bottom:6px;border-left-width:4px}
   .member.drag{cursor:grab}
   .member.drag:active{cursor:grabbing}
+  /* กรอบกลุ่มปาตี้ใน list ด้านขวา (โหมด sort ปาตี้) — แยกกลุ่มให้เห็นชัดว่าใครมากับใคร */
+  .pgbox{border:1px solid var(--line);border-radius:11px;padding:8px 8px 2px;margin-bottom:10px;background:color-mix(in srgb,var(--g) 6%,transparent)}
+  .pgbox-head{font-size:12.5px;font-weight:800;color:var(--muted);margin:2px 4px 7px}
+  .pgbox-head b{color:var(--txt)}
+  .pgbox .member{margin-bottom:6px}
   /* ช่องติ๊กเช็คมา/ไม่มา */
   input.attend{width:17px!important;height:17px;flex:none;padding:0!important;margin:0!important;accent-color:#3ee0a0;cursor:pointer;background:transparent!important;border:none!important;box-shadow:none!important}
   .member.absent{opacity:.42}
@@ -781,13 +787,7 @@ function renderPick(){
     '<div class="cnt">ดูอย่างเดียว</div><div class="go">กดเพื่อเข้า →</div>';
   p.onclick=openProgress;
   box.appendChild(p);
-  // 3) การ์ด จัดการรายชื่อ (โชว์ทุกคน แต่เปิดได้เฉพาะแอดมิน)
-  const m=document.createElement("div");m.className="gcard"+(IS_ADMIN?"":" locked");m.style.setProperty("--gc","#ffd35c");
-  m.innerHTML='<div class="no">'+(IS_ADMIN?"🛠":"🔒")+'</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:#1a1710">🛠</div>'+
-    '<h2>จัดการรายชื่อ</h2><div class="tag">แก้ไข / ลบ ตัวละคร PIGROCKS</div>'+
-    '<div class="cnt">'+(IS_ADMIN?"เฉพาะแอดมิน":"🔒 เฉพาะแอดมิน")+'</div><div class="go">'+(IS_ADMIN?"กดเพื่อเข้า →":"ล็อกอยู่")+'</div>';
-  m.onclick=IS_ADMIN?openMng:function(){toast("หน้านี้เฉพาะแอดมินเท่านั้น 🔒");};
-  box.appendChild(m);
+  // การ์ด "จัดการรายชื่อ" ถูกเอาออกแล้ว — ปุ่มแก้ไข/ลบ ย้ายไปอยู่ใน list ด้านขวาของหน้าจัดปาตี้ทุกหน้าแทน
 }
 function openGuild(i){
   cur=i;const g=G();
@@ -1078,6 +1078,14 @@ function memberEl(m,drag){
     ${m.isLeader?'<span class="crown">👑</span>':""}<span class="nm">${m.ign}</span>
     <span class="meta"><b>${(m.cp/1000).toFixed(0)}k</b></span>`;
   if(drag){el.addEventListener("dragstart",()=>{dragId=m.id;el.classList.add("dragging")});el.addEventListener("dragend",()=>el.classList.remove("dragging"));el.addEventListener("click",()=>selectMember(m.id));if(m.id===selectedId){el.style.outline="2px solid var(--g)";el.style.outlineOffset="1px";}}
+  if(IS_ADMIN){
+    const ed=document.createElement("button");ed.className="miniedit";ed.textContent="✎";ed.title="แก้ไข";
+    ed.onclick=e=>{e.stopPropagation();quickEdit(m.ign);};
+    el.appendChild(ed);
+    const dl=document.createElement("button");dl.className="minidel";dl.textContent="🗑";dl.title="ลบ";
+    dl.onclick=e=>{e.stopPropagation();quickDelete(m.ign);};
+    el.appendChild(dl);
+  }
   return el;
 }
 function renderPool(){
@@ -1099,24 +1107,38 @@ function renderPool(){
   }
   function addPool(){pool.forEach(m=>list.appendChild(memberEl(m,IS_ADMIN)));}
   if(sortBy==="party"){
-    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) ให้อยู่ติดกัน ไม่ว่าจะจัดตี้แล้วหรือยัง
+    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) เป็นกรอบแยกชัดเจน ไม่ว่าจะจัดตี้แล้วหรือยัง คนเดี่ยวไปอยู่ล่างสุด
     const all=pool.concat(assigned);
     const groups={},singles=[];
-    all.forEach(m=>{const k=groupKey(m);if(k===null)singles.push({key:"s"+m.id,ms:[m]});else(groups[k]=groups[k]||[]).push(m);});
-    const units=singles.slice();
-    Object.keys(groups).forEach(k=>{
+    all.forEach(m=>{const k=groupKey(m);if(k===null)singles.push(m);else(groups[k]=groups[k]||[]).push(m);});
+    const gunits=Object.keys(groups).map(k=>{
       const arr=groups[k].slice().sort((a,b)=>(b.isLeader?1:0)-(a.isLeader?1:0)||b.cp-a.cp);
-      units.push({key:"g"+k,ms:arr});
+      const cp=arr.reduce((s,m)=>s+m.cp,0);
+      return {arr,cp};
     });
-    units.forEach(u=>{u.maxcp=Math.max(...u.ms.map(m=>m.cp));});
-    units.sort((a,b)=>b.maxcp-a.maxcp);
-    units.forEach(u=>{
-      u.ms.forEach(m=>{
+    gunits.sort((a,b)=>b.cp-a.cp);
+    gunits.forEach(u=>{
+      const box=document.createElement("div");box.className="pgbox";
+      const leader=u.arr.find(m=>m.isLeader);
+      const head=document.createElement("div");head.className="pgbox-head";
+      head.innerHTML=(leader?('👑 <b>'+escHtml(leader.ign)+'</b>'):'<b>ปาตี้</b>')+' • '+u.arr.length+' คน • '+(u.cp/1000).toFixed(0)+'k';
+      box.appendChild(head);
+      u.arr.forEach(m=>{
+        const el=memberEl(m,IS_ADMIN&&m.party<0);
+        if(m.party>=0){const pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.party+1);el.appendChild(pb);}
+        box.appendChild(el);
+      });
+      list.appendChild(box);
+    });
+    if(singles.length){
+      const sh=document.createElement("div");sh.className="subhead";sh.textContent="ยังไม่มีปาตี้";list.appendChild(sh);
+      singles.sort((a,b)=>b.cp-a.cp);
+      singles.forEach(m=>{
         const el=memberEl(m,IS_ADMIN&&m.party<0);
         if(m.party>=0){const pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.party+1);el.appendChild(pb);}
         list.appendChild(el);
       });
-    });
+    }
   }else{
     addPool();
     addAssigned();
@@ -2072,7 +2094,42 @@ function mngEditSave(){
   document.getElementById("me_status").textContent="กำลังบันทึก...";
   sb.from('members').update(rec).eq('guild','PIGROCKS').eq('ign',mngEditIgn).select('ign').then(function(r){
     if(r.error){document.getElementById("me_status").textContent="บันทึกไม่ได้: "+r.error.message;return;}
-    toast("บันทึกแล้ว ✅");mngEditClose();loadMng();
+    toast("บันทึกแล้ว ✅");mngEditClose();
+    var mngEl=document.getElementById("mng");
+    if(mngEl&&!mngEl.classList.contains("hidden"))loadMng();
+    refreshCurrentPartyPage();
+  });
+}
+/* ---------- แก้ไข/ลบตัวละครแบบเร็ว ใช้ร่วมกันได้ทุกหน้า (list ด้านขวาของ GvG/Castle/ตัวละครและ Party) ---------- */
+function refreshCurrentPartyPage(){
+  var appEl=document.getElementById("app"),castleEl=document.getElementById("castle"),cpEl=document.getElementById("castparty");
+  if(appEl&&!appEl.classList.contains("hidden"))loadGuild(G().key,true);
+  if(castleEl&&!castleEl.classList.contains("hidden"))loadCastle();
+  if(cpEl&&!cpEl.classList.contains("hidden"))loadCastParty();
+}
+function quickDelete(ign){
+  if(!IS_ADMIN)return;
+  if(!confirm('ลบ "'+ign+'" ออกจากฐาน PIGROCKS? (ย้อนไม่ได้)'))return;
+  sb.from('members').delete().eq('guild','PIGROCKS').eq('ign',ign).select('ign').then(function(r){
+    if(r.error){toast("ลบไม่ได้: "+r.error.message);return;}
+    toast('ลบ "'+ign+'" แล้ว ✅');
+    refreshCurrentPartyPage();
+  });
+}
+function quickEdit(ign){
+  if(!IS_ADMIN)return;
+  sb.from('members').select('*').eq('guild','PIGROCKS').eq('ign',ign).then(function(r){
+    if(r.error||!r.data||!r.data.length){toast("โหลดข้อมูลไม่ได้");return;}
+    var m=r.data[0];
+    mngEditIgn=m.ign;
+    document.getElementById("me_ign").value=m.ign;
+    var sel=document.getElementById("me_cls");
+    sel.innerHTML='<option value="">— ไม่ระบุ —</option>'+CLASSES.map(function(c){return '<option'+(c.n===m.cls?' selected':'')+'>'+c.n+'</option>';}).join("");
+    document.getElementById("me_w1").value=m.cp_w1==null?'':m.cp_w1;
+    document.getElementById("me_w2").value=m.cp_w2==null?'':m.cp_w2;
+    document.getElementById("me_w3").value=m.cp_w3==null?'':m.cp_w3;
+    document.getElementById("me_status").textContent="";
+    document.getElementById("mngEditOv").classList.remove("hidden");
   });
 }
 
@@ -2202,6 +2259,14 @@ function castleMemberEl(m,drag){
     el.addEventListener("click",function(e){e.stopPropagation();castleSelectedId=(castleSelectedId===m.ign?null:m.ign);renderCastlePool();if(castleSelectedId!=null)toast("เลือกแล้ว — แตะช่องปาตี้ที่จะวาง");});
     if(m.ign===castleSelectedId){el.style.outline="2px solid var(--g)";el.style.outlineOffset="1px";}
   }
+  if(IS_ADMIN){
+    var ed=document.createElement("button");ed.className="miniedit";ed.textContent="✎";ed.title="แก้ไข";
+    ed.onclick=function(e){e.stopPropagation();quickEdit(m.ign);};
+    el.appendChild(ed);
+    var dl=document.createElement("button");dl.className="minidel";dl.textContent="🗑";dl.title="ลบ";
+    dl.onclick=function(e){e.stopPropagation();quickDelete(m.ign);};
+    el.appendChild(dl);
+  }
   return el;
 }
 function castlePersistOne(m){
@@ -2251,24 +2316,38 @@ function renderCastlePool(){
   }
   function addCastlePool(){pool.forEach(function(m){list.appendChild(castleMemberEl(m,IS_ADMIN));});}
   if(CASTLE.sortBy==="party"){
-    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) ให้อยู่ติดกัน ไม่ว่าจะจัดตี้แล้วหรือยัง
+    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) เป็นกรอบแยกชัดเจน ไม่ว่าจะจัดตี้แล้วหรือยัง คนเดี่ยวไปอยู่ล่างสุด
     var all=pool.concat(assigned);
     var groups={},singles=[];
-    all.forEach(function(m){var k=castleGroupKey(m);if(k===null)singles.push({key:"s"+m.ign,ms:[m]});else(groups[k]=groups[k]||[]).push(m);});
-    var units=singles.slice();
-    Object.keys(groups).forEach(function(k){
+    all.forEach(function(m){var k=castleGroupKey(m);if(k===null)singles.push(m);else(groups[k]=groups[k]||[]).push(m);});
+    var gunits=Object.keys(groups).map(function(k){
       var arr=groups[k].slice().sort(function(a,b){return (b.is_leader?1:0)-(a.is_leader?1:0)||b.cp-a.cp;});
-      units.push({key:"g"+k,ms:arr});
+      var cp=arr.reduce(function(s,m){return s+m.cp;},0);
+      return {arr:arr,cp:cp};
     });
-    units.forEach(function(u){u.maxcp=Math.max.apply(null,u.ms.map(function(m){return m.cp;}));});
-    units.sort(function(a,b){return b.maxcp-a.maxcp;});
-    units.forEach(function(u){
-      u.ms.forEach(function(m){
+    gunits.sort(function(a,b){return b.cp-a.cp;});
+    gunits.forEach(function(u){
+      var box=document.createElement("div");box.className="pgbox";
+      var leader=u.arr.find(function(m){return m.is_leader;});
+      var head=document.createElement("div");head.className="pgbox-head";
+      head.innerHTML=(leader?('👑 <b>'+escHtml(leader.ign)+'</b>'):'<b>ปาตี้</b>')+' • '+u.arr.length+' คน • '+(u.cp/1000).toFixed(0)+'k';
+      box.appendChild(head);
+      u.arr.forEach(function(m){
+        var el=castleMemberEl(m,IS_ADMIN&&(m.castle_party==null||m.castle_party<0));
+        if(m.castle_party!=null&&m.castle_party>=0){var pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.castle_party+1);el.appendChild(pb);}
+        box.appendChild(el);
+      });
+      list.appendChild(box);
+    });
+    if(singles.length){
+      var sh1=document.createElement("div");sh1.className="subhead";sh1.textContent="ยังไม่มีปาตี้";list.appendChild(sh1);
+      singles.sort(function(a,b){return b.cp-a.cp;});
+      singles.forEach(function(m){
         var el=castleMemberEl(m,IS_ADMIN&&(m.castle_party==null||m.castle_party<0));
         if(m.castle_party!=null&&m.castle_party>=0){var pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.castle_party+1);el.appendChild(pb);}
         list.appendChild(el);
       });
-    });
+    }
   }else{
     addCastlePool();
     addCastleAssigned();
@@ -2303,6 +2382,75 @@ function loadCastParty(){
 }
 function cpartyGroupKey(m){return m.is_leader?m.ign:(m.leader||null);}
 function castPartyOpenForm(){openGuild(0);openSheet('menu');}
+var cpartyDragIgn=null;
+function castPartyPromote(ign){
+  if(!IS_ADMIN)return;
+  sb.from('members').update({is_leader:true,leader:null}).eq('guild','PIGROCKS').eq('ign',ign).then(function(r){
+    if(r.error){toast("ตั้งหัวปาตี้ไม่ได้: "+r.error.message);return;}
+    toast('ตั้ง "'+ign+'" เป็นหัวปาตี้แล้ว 👑');
+    loadCastParty();
+  });
+}
+function castPartyBind(ign,leaderIgn){
+  if(!IS_ADMIN||!ign||!leaderIgn||ign===leaderIgn)return;
+  var m=CPARTY.rows.find(function(x){return x.ign===ign;});
+  if(m&&m.is_leader){toast("คนนี้เป็นหัวปาตี้อยู่ — ถอดออกก่อน (✕) ค่อยลากเข้ากลุ่มอื่น");return;}
+  sb.from('members').update({is_leader:false,leader:leaderIgn}).eq('guild','PIGROCKS').eq('ign',ign).then(function(r){
+    if(r.error){toast("ผูกปาตี้ไม่ได้: "+r.error.message);return;}
+    toast('เพิ่ม "'+ign+'" เข้าปาตี้ของ '+leaderIgn+' แล้ว');
+    loadCastParty();
+  });
+}
+function castPartyRemove(ign,wasLeader){
+  if(!IS_ADMIN)return;
+  if(wasLeader){
+    if(!confirm('ถอด "'+ign+'" ออกจากการเป็นหัวปาตี้? ลูกทีมทั้งหมดจะกลายเป็นคนเดี่ยว'))return;
+    var followers=CPARTY.rows.filter(function(m){return m.leader===ign;});
+    Promise.all(followers.map(function(m){return sb.from('members').update({leader:null}).eq('guild','PIGROCKS').eq('ign',m.ign);}))
+      .then(function(){return sb.from('members').update({is_leader:false,leader:null}).eq('guild','PIGROCKS').eq('ign',ign);})
+      .then(function(r){
+        if(r&&r.error){toast("ถอดไม่ได้: "+r.error.message);return;}
+        toast('ยุบปาตี้ของ "'+ign+'" แล้ว');
+        loadCastParty();
+      });
+  }else{
+    sb.from('members').update({leader:null}).eq('guild','PIGROCKS').eq('ign',ign).then(function(r){
+      if(r.error){toast("ถอดไม่ได้: "+r.error.message);return;}
+      toast('ถอด "'+ign+'" ออกจากปาตี้แล้ว');
+      loadCastParty();
+    });
+  }
+}
+function castPartyMemberEl(m,opts){
+  opts=opts||{};
+  var canDrag=IS_ADMIN&&!m.is_leader;
+  var el=document.createElement("div");el.className="member"+(canDrag?" drag":"");el.draggable=!!canDrag;
+  el.style.borderLeftColor=classColor(m.cls);
+  el.innerHTML=clsDotHtml(m.cls)+(m.is_leader?'<span class="crown">👑</span>':'')+'<span class="nm">'+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>';
+  if(canDrag){
+    el.addEventListener("dragstart",function(){cpartyDragIgn=m.ign;el.classList.add("dragging");});
+    el.addEventListener("dragend",function(){el.classList.remove("dragging");});
+  }
+  if(IS_ADMIN){
+    if(!m.is_leader){
+      var pr=document.createElement("button");pr.className="miniedit";pr.textContent="👑+";pr.title="ตั้งเป็นหัวปาตี้";
+      pr.onclick=function(e){e.stopPropagation();castPartyPromote(m.ign);};
+      el.appendChild(pr);
+    }
+    if(opts.showRemove){
+      var rm=document.createElement("button");rm.className="minidel";rm.textContent="✕";rm.title="ถอดออกจากปาตี้";
+      rm.onclick=function(e){e.stopPropagation();castPartyRemove(m.ign,!!m.is_leader);};
+      el.appendChild(rm);
+    }
+    var ed=document.createElement("button");ed.className="miniedit";ed.textContent="✎";ed.title="แก้ไข";
+    ed.onclick=function(e){e.stopPropagation();quickEdit(m.ign);};
+    el.appendChild(ed);
+    var dl=document.createElement("button");dl.className="minidel";dl.textContent="🗑";dl.title="ลบ";
+    dl.onclick=function(e){e.stopPropagation();quickDelete(m.ign);};
+    el.appendChild(dl);
+  }
+  return el;
+}
 function renderCastPartyGroups(){
   var box=document.getElementById("cpartyGroups");box.innerHTML="";
   var groups={};
@@ -2321,13 +2469,13 @@ function renderCastPartyGroups(){
     var title=leader?("👑 "+escHtml(leader.ign)):escHtml(u.key);
     card.innerHTML='<h4><span class="pname">'+title+'</span><span class="cp">'+u.ms.length+' คน • '+(u.cp/1000).toFixed(0)+'k</span></h4>';
     var list=document.createElement("div");list.style.cssText="display:flex;flex-direction:column;gap:6px";
-    u.ms.forEach(function(m){
-      var row=document.createElement("div");row.className="member";
-      row.style.borderLeftColor=classColor(m.cls);
-      row.innerHTML=clsDotHtml(m.cls)+(m.is_leader?'<span class="crown">👑</span>':'')+'<span class="nm">'+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>';
-      list.appendChild(row);
-    });
+    u.ms.forEach(function(m){list.appendChild(castPartyMemberEl(m,{showRemove:true}));});
     card.appendChild(list);
+    if(IS_ADMIN&&leader){
+      card.ondragover=function(e){e.preventDefault();card.classList.add("over");};
+      card.ondragleave=function(){card.classList.remove("over");};
+      card.ondrop=function(e){e.preventDefault();card.classList.remove("over");if(cpartyDragIgn!=null){var id=cpartyDragIgn;cpartyDragIgn=null;castPartyBind(id,leader.ign);}};
+    }
     box.appendChild(card);
   });
 }
@@ -2340,12 +2488,11 @@ function renderCastPartySolo(){
   var list=document.getElementById("cpartySololist");list.innerHTML="";
   document.getElementById("cpartySoloCount").textContent=solo.length+" คนยังไม่มีปาตี้";
   if(!solo.length){list.innerHTML='<div class="poolempty">— ทุกคนมีปาตี้แล้ว —</div>';return;}
-  solo.forEach(function(m){
-    var el=document.createElement("div");el.className="member";
-    el.innerHTML='<span class="badge" style="background:'+classColor(m.cls)+'22;color:'+classColor(m.cls)+'">'+escHtml(m.cls||'')+'</span>'+
-      '<span class="nm">'+escHtml(m.ign)+'</span><span class="meta"><b>'+(m.cp/1000).toFixed(0)+'k</b></span>';
-    list.appendChild(el);
-  });
+  solo.forEach(function(m){list.appendChild(castPartyMemberEl(m,{}));});
+  if(IS_ADMIN){
+    list.ondragover=function(e){e.preventDefault();};
+    list.ondrop=function(e){e.preventDefault();if(cpartyDragIgn!=null){castPartyRemove(cpartyDragIgn,false);cpartyDragIgn=null;}};
+  }
 }
 function renderCastParty(){renderCastPartyGroups();renderCastPartySolo();}
 
