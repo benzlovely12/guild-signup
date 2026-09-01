@@ -136,6 +136,8 @@
   .member .crown{font-size:13px}
   .member .meta{margin-left:auto;font-size:11px;color:var(--muted)}
   .member .meta b{color:var(--gold)}
+  .member .scp{margin-left:auto;color:var(--gold);font-weight:800;font-size:11px}
+  .member .miniedit,.member .minidel{margin-left:4px}
   .grpcard{border:1px solid var(--line);border-left-width:4px;border-radius:11px;padding:8px;margin-bottom:9px;background:#141a2e}
   .grphead{display:flex;align-items:center;gap:7px;margin-bottom:7px;font-size:12px}
   .grphead .lead{font-weight:800}
@@ -2366,7 +2368,7 @@ function castPartyPromote(ign){
 function castPartyBind(ign,leaderIgn){
   if(!IS_ADMIN||!ign||!leaderIgn||ign===leaderIgn)return;
   var m=CPARTY.rows.find(function(x){return x.ign===ign;});
-  if(m&&m.is_leader){toast("คนนี้เป็นหัวปาตี้อยู่ — ถอดออกก่อน (✕) ค่อยลากเข้ากลุ่มอื่น");return;}
+  if(m&&m.is_leader){toast("คนนี้เป็นหัวปาตี้อยู่ — ลากไปวาง list ขวาก่อน ค่อยลากเข้ากลุ่มอื่น");return;}
   sb.from('members').update({is_leader:false,leader:leaderIgn}).eq('guild','PIGROCKS').eq('ign',ign).then(function(r){
     if(r.error){toast("ผูกปาตี้ไม่ได้: "+r.error.message);return;}
     toast('เพิ่ม "'+ign+'" เข้าปาตี้ของ '+leaderIgn+' แล้ว');
@@ -2395,7 +2397,8 @@ function castPartyRemove(ign,wasLeader){
 }
 function castPartyMemberEl(m,opts){
   opts=opts||{};
-  var canDrag=IS_ADMIN&&!m.is_leader;
+  // ทุกคน (รวมหัวปาตี้) ลากได้ — ลากออกไปวางที่ list ขวาเพื่อถอด/ยุบปาตี้ ลากไปวางการ์ดอื่นเพื่อผูกเข้าปาตี้นั้น (ยกเว้นตัวเองเป็นหัวปาตี้อยู่)
+  var canDrag=IS_ADMIN;
   var el=document.createElement("div");el.className="member"+(canDrag?" drag":"");el.draggable=!!canDrag;
   el.style.borderLeftColor=classColor(m.cls);
   el.innerHTML=clsDotHtml(m.cls)+(m.is_leader?'<span class="crown">👑</span>':'')+'<span class="nm">'+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>';
@@ -2403,16 +2406,11 @@ function castPartyMemberEl(m,opts){
     el.addEventListener("dragstart",function(){cpartyDragIgn=m.ign;el.classList.add("dragging");});
     el.addEventListener("dragend",function(){el.classList.remove("dragging");});
   }
-  if(IS_ADMIN){
+  if(IS_ADMIN&&opts.buttons){
     if(!m.is_leader){
       var pr=document.createElement("button");pr.className="miniedit";pr.textContent="👑+";pr.title="ตั้งเป็นหัวปาตี้";
       pr.onclick=function(e){e.stopPropagation();castPartyPromote(m.ign);};
       el.appendChild(pr);
-    }
-    if(opts.showRemove){
-      var rm=document.createElement("button");rm.className="minidel";rm.textContent="✕";rm.title="ถอดออกจากปาตี้";
-      rm.onclick=function(e){e.stopPropagation();castPartyRemove(m.ign,!!m.is_leader);};
-      el.appendChild(rm);
     }
     var ed=document.createElement("button");ed.className="miniedit";ed.textContent="✎";ed.title="แก้ไข";
     ed.onclick=function(e){e.stopPropagation();quickEdit(m.ign);};
@@ -2441,7 +2439,8 @@ function renderCastPartyGroups(){
     var title=leader?("👑 "+escHtml(leader.ign)):escHtml(u.key);
     card.innerHTML='<h4><span class="pname">'+title+'</span><span class="cp">'+u.ms.length+' คน • '+(u.cp/1000).toFixed(0)+'k</span></h4>';
     var list=document.createElement("div");list.style.cssText="display:flex;flex-direction:column;gap:6px";
-    u.ms.forEach(function(m){list.appendChild(castPartyMemberEl(m,{showRemove:true}));});
+    // การ์ดปาตี้ไว้ดูอย่างเดียว ไม่มีปุ่ม — จะถอด/ยุบ/ผูกปาตี้ ให้ลากคนไปวางที่ list ขวาแทน
+    u.ms.forEach(function(m){list.appendChild(castPartyMemberEl(m,{buttons:false}));});
     card.appendChild(list);
     if(IS_ADMIN&&leader){
       card.ondragover=function(e){e.preventDefault();card.classList.add("over");};
@@ -2460,10 +2459,17 @@ function renderCastPartySolo(){
   var list=document.getElementById("cpartySololist");list.innerHTML="";
   document.getElementById("cpartySoloCount").textContent=solo.length+" คนยังไม่มีปาตี้";
   if(!solo.length){list.innerHTML='<div class="poolempty">— ทุกคนมีปาตี้แล้ว —</div>';return;}
-  solo.forEach(function(m){list.appendChild(castPartyMemberEl(m,{}));});
+  solo.forEach(function(m){list.appendChild(castPartyMemberEl(m,{buttons:true}));});
   if(IS_ADMIN){
     list.ondragover=function(e){e.preventDefault();};
-    list.ondrop=function(e){e.preventDefault();if(cpartyDragIgn!=null){castPartyRemove(cpartyDragIgn,false);cpartyDragIgn=null;}};
+    list.ondrop=function(e){
+      e.preventDefault();
+      if(cpartyDragIgn!=null){
+        var id=cpartyDragIgn;cpartyDragIgn=null;
+        var dm=CPARTY.rows.find(function(x){return x.ign===id;});
+        castPartyRemove(id,!!(dm&&dm.is_leader));
+      }
+    };
   }
 }
 function renderCastParty(){renderCastPartyGroups();renderCastPartySolo();}
