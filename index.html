@@ -54,7 +54,7 @@
   .gcard .cnt{margin-top:14px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
 
   /* App */
-  #app,#castle{max-width:1240px;margin:0 auto;padding:16px 18px 40px}
+  #app,#castle,#castparty{max-width:1240px;margin:0 auto;padding:16px 18px 40px}
   header.top{display:flex;align-items:center;gap:13px;margin-bottom:16px}
   .glogo{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:26px;background:color-mix(in srgb,var(--g) 22%,transparent)}
   .gname{font-size:20px;font-weight:800;letter-spacing:.5px}
@@ -189,7 +189,7 @@
   .mtab{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:10px;font-weight:800;font-size:13px}
   .mtab.on{background:var(--g);color:#111;border-color:transparent}
   @media(max-width:720px){
-    #app,#castle{padding:8px 10px 44px}
+    #app,#castle,#castparty{padding:8px 10px 44px}
     header.top{flex-wrap:wrap;gap:8px;padding:10px 12px}
     .mtabs{display:flex;gap:6px;margin-bottom:12px;position:sticky;top:6px;z-index:30}
     .reg-grid{grid-template-columns:1fr}
@@ -519,6 +519,37 @@
   </div>
 </div>
 
+<!-- ===== หน้า ตัวละครและ Party (PIGROCKS) — ดูใครมากับใคร + จัดปาตี้ตัวเองได้อิสระ ===== -->
+<div id="castparty" class="hidden">
+  <header class="top">
+    <div class="glogo">🧑‍🤝‍🧑</div>
+    <div>
+      <div class="gname">PIGROCKS — ตัวละครและ Party</div>
+      <div class="gmeta">ดูว่าใครมากับใคร • จัดปาตี้ตัวเองได้อิสระ</div>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="toolbtn g" onclick="castPartyOpenForm()">📝 จัดปาตี้ / อัพเดตตัวละคร</button>
+      <button class="toolbtn" onclick="backFromPage()">↩ ย้อนกลับ</button>
+    </div>
+  </header>
+  <div class="bottom">
+    <div class="boardcol">
+      <div class="board-head"><h3>ปาตี้ที่จับกลุ่มไว้</h3><span class="gmeta">ใครมากับใคร</span></div>
+      <div class="parties" id="cpartyGroups"></div>
+    </div>
+    <div class="pool">
+      <h3>ยังไม่มีปาตี้ <small id="cpartySoloCount">0</small></h3>
+      <div class="search"><input id="cpartySearch" placeholder="ค้นหาชื่อ/อาชีพ..." oninput="renderCastPartySolo()"></div>
+      <div class="sorts">
+        <button class="chip on" data-cp="cp" onclick="setCPartySort('cp')">CP</button>
+        <button class="chip" data-cp="name" onclick="setCPartySort('name')">ชื่อ A→Z</button>
+        <button class="chip" data-cp="class" onclick="setCPartySort('class')">อาชีพ</button>
+      </div>
+      <div class="poollist" id="cpartySololist"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== APP ===== -->
 <div id="app" class="hidden" data-mtab="party">
   <img id="gcover" class="gcover" alt="cover">
@@ -737,7 +768,14 @@ function renderPick(){
     <div class="cnt">${cnt}</div><div class="go">กดเพื่อเข้า →</div>`;
   cs.onclick=openCastle;
   box.appendChild(cs);
-  // 2) การ์ด การพัฒนาตัวละคร (ดูอย่างเดียว ทุกคนเข้าได้)
+  // 2) การ์ด ตัวละครและ Party (ดูใครมากับใคร + จัดปาตี้ตัวเองได้ ทุกคนเข้าได้)
+  const cp2=document.createElement("div");cp2.className="gcard";cp2.style.setProperty("--gc","#9d7bff");
+  cp2.innerHTML='<div class="no">🧑‍🤝‍🧑</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:#1c1a33">🧑‍🤝‍🧑</div>'+
+    '<h2>ตัวละครและ Party</h2><div class="tag">ดูว่าใครมากับใคร • จัดปาตี้ตัวเองได้อิสระ</div>'+
+    '<div class="cnt">'+cnt+'</div><div class="go">กดเพื่อเข้า →</div>';
+  cp2.onclick=openCastParty;
+  box.appendChild(cp2);
+  // 3) การ์ด การพัฒนาตัวละคร (ดูอย่างเดียว ทุกคนเข้าได้)
   const p=document.createElement("div");p.className="gcard";p.style.setProperty("--gc","#4fd8ff");
   p.innerHTML='<div class="no">📈</div><div class="lg" style="display:flex;align-items:center;justify-content:center;font-size:52px;background:#0c2733">📈</div>'+
     '<h2>การพัฒนาตัวละคร</h2><div class="tag">ดูพัฒนาการ CP รายสัปดาห์ของ PIGROCKS</div>'+
@@ -1985,7 +2023,7 @@ function renderCharTable(rows,manage,container){
   CT={rows:rows,manage:manage,container:container,key:'latest',dir:'desc'};
   renderCT();
 }
-function pageShow(id){["pick","app","manage","prog","mng","castle"].forEach(function(x){var e=document.getElementById(x);if(e)e.classList.toggle("hidden",x!==id);});}
+function pageShow(id){["pick","app","manage","prog","mng","castle","castparty"].forEach(function(x){var e=document.getElementById(x);if(e)e.classList.toggle("hidden",x!==id);});}
 function backFromPage(){pageShow("pick");renderPick();loadCounts();}
 function openProgress(){
   pageShow("prog");
@@ -2253,6 +2291,65 @@ function castleClearAll(){
   });
 }
 function renderCastle(){renderCastleBoard();renderCastlePool();}
+
+/* ===== หน้า ตัวละครและ Party (PIGROCKS) — ดูใครมากับใคร (ปาตี้ = ก๊วนที่ผูกกันตอนลงทะเบียน) ===== */
+var CPARTY={rows:[],sortBy:"cp"};
+function openCastParty(){
+  pageShow("castparty");
+  loadCastParty();
+}
+function loadCastParty(){
+  document.getElementById("cpartyGroups").innerHTML='<div class="poolempty">— กำลังโหลด... —</div>';
+  fetchPIG().then(function(ms){CPARTY.rows=ms;renderCastParty();})
+    .catch(function(e){document.getElementById("cpartyGroups").innerHTML='<div class="poolempty">โหลดไม่ได้: '+((e&&e.message)||e)+'</div>';});
+}
+function cpartyGroupKey(m){return m.is_leader?m.ign:(m.leader||null);}
+function castPartyOpenForm(){openGuild(0);openSheet('menu');}
+function renderCastPartyGroups(){
+  var box=document.getElementById("cpartyGroups");box.innerHTML="";
+  var groups={};
+  CPARTY.rows.forEach(function(m){var k=cpartyGroupKey(m);if(k!==null)(groups[k]=groups[k]||[]).push(m);});
+  var keys=Object.keys(groups);
+  if(!keys.length){box.innerHTML='<div class="poolempty">— ยังไม่มีใครจัดปาตี้ —</div>';return;}
+  var units=keys.map(function(k){
+    var arr=groups[k].slice().sort(function(a,b){return (b.is_leader?1:0)-(a.is_leader?1:0)||b.cp-a.cp;});
+    var cp=arr.reduce(function(s,m){return s+(m.cp||0);},0);
+    return {key:k,ms:arr,cp:cp};
+  });
+  units.sort(function(a,b){return b.cp-a.cp;});
+  units.forEach(function(u){
+    var card=document.createElement("div");card.className="party";
+    var leader=u.ms.find(function(m){return m.is_leader;});
+    var title=leader?("👑 "+escHtml(leader.ign)):escHtml(u.key);
+    card.innerHTML='<h4><span class="pname">'+title+'</span><span class="cp">'+u.ms.length+' คน • '+(u.cp/1000).toFixed(0)+'k</span></h4>';
+    var list=document.createElement("div");list.style.cssText="display:flex;flex-direction:column;gap:6px";
+    u.ms.forEach(function(m){
+      var row=document.createElement("div");row.className="member";
+      row.style.borderLeftColor=classColor(m.cls);
+      row.innerHTML=clsDotHtml(m.cls)+(m.is_leader?'<span class="crown">👑</span>':'')+'<span class="nm">'+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>';
+      list.appendChild(row);
+    });
+    card.appendChild(list);
+    box.appendChild(card);
+  });
+}
+function cpartyCmp(a,b){return CPARTY.sortBy==="name"?a.ign.localeCompare(b.ign):CPARTY.sortBy==="class"?(a.cls||'').localeCompare(b.cls||'')||b.cp-a.cp:b.cp-a.cp;}
+function setCPartySort(s){CPARTY.sortBy=s;document.querySelectorAll('.chip[data-cp]').forEach(function(c){c.classList.toggle('on',c.dataset.cp===s);});renderCastPartySolo();}
+function renderCastPartySolo(){
+  var q=(document.getElementById("cpartySearch").value||"").toLowerCase();
+  var solo=CPARTY.rows.filter(function(m){return cpartyGroupKey(m)===null;}).filter(function(m){return !q||m.ign.toLowerCase().includes(q)||(m.cls||'').toLowerCase().includes(q);});
+  solo.sort(cpartyCmp);
+  var list=document.getElementById("cpartySololist");list.innerHTML="";
+  document.getElementById("cpartySoloCount").textContent=solo.length+" คนยังไม่มีปาตี้";
+  if(!solo.length){list.innerHTML='<div class="poolempty">— ทุกคนมีปาตี้แล้ว —</div>';return;}
+  solo.forEach(function(m){
+    var el=document.createElement("div");el.className="member";
+    el.innerHTML='<span class="badge" style="background:'+classColor(m.cls)+'22;color:'+classColor(m.cls)+'">'+escHtml(m.cls||'')+'</span>'+
+      '<span class="nm">'+escHtml(m.ign)+'</span><span class="meta"><b>'+(m.cp/1000).toFixed(0)+'k</b></span>';
+    list.appendChild(el);
+  });
+}
+function renderCastParty(){renderCastPartyGroups();renderCastPartySolo();}
 
 /* init */
 renderPick();loadCounts();
