@@ -1078,14 +1078,7 @@ function memberEl(m,drag){
     ${m.isLeader?'<span class="crown">👑</span>':""}<span class="nm">${m.ign}</span>
     <span class="meta"><b>${(m.cp/1000).toFixed(0)}k</b></span>`;
   if(drag){el.addEventListener("dragstart",()=>{dragId=m.id;el.classList.add("dragging")});el.addEventListener("dragend",()=>el.classList.remove("dragging"));el.addEventListener("click",()=>selectMember(m.id));if(m.id===selectedId){el.style.outline="2px solid var(--g)";el.style.outlineOffset="1px";}}
-  if(IS_ADMIN){
-    const ed=document.createElement("button");ed.className="miniedit";ed.textContent="✎";ed.title="แก้ไข";
-    ed.onclick=e=>{e.stopPropagation();quickEdit(m.ign);};
-    el.appendChild(ed);
-    const dl=document.createElement("button");dl.className="minidel";dl.textContent="🗑";dl.title="ลบ";
-    dl.onclick=e=>{e.stopPropagation();quickDelete(m.ign);};
-    el.appendChild(dl);
-  }
+  // หน้านี้ไว้จัดตี้วอเท่านั้น ไม่มีปุ่มแก้ไข/ลบ (แก้ไขข้อมูลตัวละครทำได้ที่หน้า "ตัวละครและ Party" เท่านั้น)
   return el;
 }
 function renderPool(){
@@ -1107,10 +1100,10 @@ function renderPool(){
   }
   function addPool(){pool.forEach(m=>list.appendChild(memberEl(m,IS_ADMIN)));}
   if(sortBy==="party"){
-    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) เป็นกรอบแยกชัดเจน ไม่ว่าจะจัดตี้แล้วหรือยัง คนเดี่ยวไปอยู่ล่างสุด
-    const all=pool.concat(assigned);
+    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) เป็นกรอบแยกชัดเจน — เฉพาะคนที่ "ยังไม่จัดตี้วอ" เท่านั้น
+    // คนที่จัดตี้วอแล้วเด้งไปอยู่ล่างสุดเหมือน sort อื่นๆ ทุกอย่าง
     const groups={},singles=[];
-    all.forEach(m=>{const k=groupKey(m);if(k===null)singles.push(m);else(groups[k]=groups[k]||[]).push(m);});
+    pool.forEach(m=>{const k=groupKey(m);if(k===null)singles.push(m);else(groups[k]=groups[k]||[]).push(m);});
     const gunits=Object.keys(groups).map(k=>{
       const arr=groups[k].slice().sort((a,b)=>(b.isLeader?1:0)-(a.isLeader?1:0)||b.cp-a.cp);
       const cp=arr.reduce((s,m)=>s+m.cp,0);
@@ -1123,22 +1116,15 @@ function renderPool(){
       const head=document.createElement("div");head.className="pgbox-head";
       head.innerHTML=(leader?('👑 <b>'+escHtml(leader.ign)+'</b>'):'<b>ปาตี้</b>')+' • '+u.arr.length+' คน • '+(u.cp/1000).toFixed(0)+'k';
       box.appendChild(head);
-      u.arr.forEach(m=>{
-        const el=memberEl(m,IS_ADMIN&&m.party<0);
-        if(m.party>=0){const pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.party+1);el.appendChild(pb);}
-        box.appendChild(el);
-      });
+      u.arr.forEach(m=>box.appendChild(memberEl(m,IS_ADMIN)));
       list.appendChild(box);
     });
     if(singles.length){
       const sh=document.createElement("div");sh.className="subhead";sh.textContent="ยังไม่มีปาตี้";list.appendChild(sh);
       singles.sort((a,b)=>b.cp-a.cp);
-      singles.forEach(m=>{
-        const el=memberEl(m,IS_ADMIN&&m.party<0);
-        if(m.party>=0){const pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.party+1);el.appendChild(pb);}
-        list.appendChild(el);
-      });
+      singles.forEach(m=>list.appendChild(memberEl(m,IS_ADMIN)));
     }
+    addAssigned();
   }else{
     addPool();
     addAssigned();
@@ -2259,14 +2245,7 @@ function castleMemberEl(m,drag){
     el.addEventListener("click",function(e){e.stopPropagation();castleSelectedId=(castleSelectedId===m.ign?null:m.ign);renderCastlePool();if(castleSelectedId!=null)toast("เลือกแล้ว — แตะช่องปาตี้ที่จะวาง");});
     if(m.ign===castleSelectedId){el.style.outline="2px solid var(--g)";el.style.outlineOffset="1px";}
   }
-  if(IS_ADMIN){
-    var ed=document.createElement("button");ed.className="miniedit";ed.textContent="✎";ed.title="แก้ไข";
-    ed.onclick=function(e){e.stopPropagation();quickEdit(m.ign);};
-    el.appendChild(ed);
-    var dl=document.createElement("button");dl.className="minidel";dl.textContent="🗑";dl.title="ลบ";
-    dl.onclick=function(e){e.stopPropagation();quickDelete(m.ign);};
-    el.appendChild(dl);
-  }
+  // หน้านี้ไว้จัดตี้วอเท่านั้น ไม่มีปุ่มแก้ไข/ลบ (แก้ไขข้อมูลตัวละครทำได้ที่หน้า "ตัวละครและ Party" เท่านั้น)
   return el;
 }
 function castlePersistOne(m){
@@ -2316,10 +2295,10 @@ function renderCastlePool(){
   }
   function addCastlePool(){pool.forEach(function(m){list.appendChild(castleMemberEl(m,IS_ADMIN));});}
   if(CASTLE.sortBy==="party"){
-    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) เป็นกรอบแยกชัดเจน ไม่ว่าจะจัดตี้แล้วหรือยัง คนเดี่ยวไปอยู่ล่างสุด
-    var all=pool.concat(assigned);
+    // จับกลุ่มคนที่ลงทะเบียนมาด้วยกัน (ก๊วน/หัวปาตี้) เป็นกรอบแยกชัดเจน — เฉพาะคนที่ "ยังไม่จัดตี้วอ" เท่านั้น
+    // คนที่จัดตี้วอแล้วเด้งไปอยู่ล่างสุดเหมือน sort อื่นๆ ทุกอย่าง
     var groups={},singles=[];
-    all.forEach(function(m){var k=castleGroupKey(m);if(k===null)singles.push(m);else(groups[k]=groups[k]||[]).push(m);});
+    pool.forEach(function(m){var k=castleGroupKey(m);if(k===null)singles.push(m);else(groups[k]=groups[k]||[]).push(m);});
     var gunits=Object.keys(groups).map(function(k){
       var arr=groups[k].slice().sort(function(a,b){return (b.is_leader?1:0)-(a.is_leader?1:0)||b.cp-a.cp;});
       var cp=arr.reduce(function(s,m){return s+m.cp;},0);
@@ -2332,22 +2311,15 @@ function renderCastlePool(){
       var head=document.createElement("div");head.className="pgbox-head";
       head.innerHTML=(leader?('👑 <b>'+escHtml(leader.ign)+'</b>'):'<b>ปาตี้</b>')+' • '+u.arr.length+' คน • '+(u.cp/1000).toFixed(0)+'k';
       box.appendChild(head);
-      u.arr.forEach(function(m){
-        var el=castleMemberEl(m,IS_ADMIN&&(m.castle_party==null||m.castle_party<0));
-        if(m.castle_party!=null&&m.castle_party>=0){var pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.castle_party+1);el.appendChild(pb);}
-        box.appendChild(el);
-      });
+      u.arr.forEach(function(m){box.appendChild(castleMemberEl(m,IS_ADMIN));});
       list.appendChild(box);
     });
     if(singles.length){
       var sh1=document.createElement("div");sh1.className="subhead";sh1.textContent="ยังไม่มีปาตี้";list.appendChild(sh1);
       singles.sort(function(a,b){return b.cp-a.cp;});
-      singles.forEach(function(m){
-        var el=castleMemberEl(m,IS_ADMIN&&(m.castle_party==null||m.castle_party<0));
-        if(m.castle_party!=null&&m.castle_party>=0){var pb=document.createElement("span");pb.className="pbadge";pb.textContent="ตี้ "+(m.castle_party+1);el.appendChild(pb);}
-        list.appendChild(el);
-      });
+      singles.forEach(function(m){list.appendChild(castleMemberEl(m,IS_ADMIN));});
     }
+    addCastleAssigned();
   }else{
     addCastlePool();
     addCastleAssigned();
