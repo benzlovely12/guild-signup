@@ -587,8 +587,7 @@
     <div id="s-menu">
       <p class="csub">เลือกสิ่งที่อยากทำ — ไม่ต้องล็อกอิน</p>
       <div class="mi" onclick="goStep('reg')"><div class="mic" style="background:color-mix(in srgb,var(--g) 20%,transparent);color:var(--g)">＋</div><div class="mtx"><b>ลงทะเบียนตัวใหม่</b><span>ยังไม่เคยลงชื่อในระบบ</span></div><span class="chev">›</span></div>
-      <div class="mi" onclick="goStep('upd')"><div class="mic" style="background:#33290f;color:var(--gold)">✎</div><div class="mtx"><b>อัพเดตตัวเดิม</b><span>แก้ชื่อ อาชีพ CP ก๊วน — ค้นได้ทุกกิลด์</span></div><span class="chev">›</span></div>
-      <div class="mi" onclick="goStep('mov')"><div class="mic" style="background:#0f2c38;color:#4fd8ff">⇄</div><div class="mtx"><b>ย้ายกิลด์</b><span>ค้นชื่อจากทุกกิลด์ แล้วเลือกปลายทาง</span></div><span class="chev">›</span></div>
+      <div class="mi" onclick="goStep('upd')"><div class="mic" style="background:#33290f;color:var(--gold)">✎</div><div class="mtx"><b>อัพเดตตัวเดิม</b><span>แก้ชื่อ อาชีพ CP ก๊วน</span></div><span class="chev">›</span></div>
     </div>
 
     <div id="s-reg" class="hidden">
@@ -858,7 +857,7 @@ function goStep(s){
   var fb=document.getElementById("fieldsBlk");
   if(s==="reg"){document.getElementById("regSlot").appendChild(fb);
     var rg=document.getElementById("regGuild");
-    rg.innerHTML=GUILDS.map(function(g){return '<option value="'+g.key+'"'+(g.key===G().key?" selected":"")+'>'+g.key+(g.key===G().key?" — กิลด์ที่เปิดอยู่":"")+'</option>';}).join("");
+    rg.innerHTML='<option value="PIGROCKS" selected>PIGROCKS — กิลด์ที่เปิดอยู่</option>';
     setMode("new");}
   if(s==="upd"){document.getElementById("updSlot").appendChild(fb);setMode("edit");
     document.getElementById("updSlot").classList.add("hidden");
@@ -872,14 +871,13 @@ function goStep(s){
 function renderEditResults(){
   var q=(document.getElementById("editSearch").value||"").trim().toLowerCase();
   var box=document.getElementById("editResults");box.innerHTML="";
-  if(xAll==null){box.innerHTML='<div class="csub">— กำลังโหลดรายชื่อทุกกิลด์... —</div>';return;}
-  if(!q){box.innerHTML='<div class="csub">— พิมพ์ชื่อเพื่อค้นหา (ค้นได้ทุกกิลด์) —</div>';return;}
-  var ms=xAll.filter(function(m){return m.ign.toLowerCase().includes(q)||m.cls.toLowerCase().includes(q);}).sort(function(a,b){return a.ign.localeCompare(b.ign);});
+  if(xAll==null){box.innerHTML='<div class="csub">— กำลังโหลดรายชื่อ... —</div>';return;}
+  if(!q){box.innerHTML='<div class="csub">— พิมพ์ชื่อเพื่อค้นหา —</div>';return;}
+  var ms=xAll.filter(function(m){return m.guild==="PIGROCKS"&&(m.ign.toLowerCase().includes(q)||m.cls.toLowerCase().includes(q));}).sort(function(a,b){return a.ign.localeCompare(b.ign);});
   if(!ms.length){box.innerHTML='<div class="csub">— ไม่พบชื่อ —</div>';return;}
   ms.slice(0,40).forEach(function(m){
     var el=document.createElement("div");el.className="er"+((editSel&&editSel.ign===m.ign)?" sel":"");
-    var gd=GUILDS.find(function(g){return g.key===m.guild;});
-    el.innerHTML=(m.isLeader?"👑 ":"")+'<span class="nm">'+m.ign+'</span><span class="meta">'+m.cls+' • '+(m.cp/1000).toFixed(0)+'k</span><span class="badge" style="margin-left:6px;background:'+((gd&&gd.color)||'#888')+'22;color:'+((gd&&gd.color)||'#aaa')+'">'+m.guild+'</span>';
+    el.innerHTML=(m.isLeader?"👑 ":"")+'<span class="nm">'+m.ign+'</span><span class="meta">'+m.cls+' • '+(m.cp/1000).toFixed(0)+'k</span>';
     el.onclick=function(){loadMemberX(m);};
     box.appendChild(el);
   });
