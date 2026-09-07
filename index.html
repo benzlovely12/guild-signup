@@ -1168,9 +1168,11 @@ function renderPool(){
     const gunits=Object.keys(groups).map(k=>{
       const arr=groups[k].slice().sort((a,b)=>(b.isLeader?1:0)-(a.isLeader?1:0)||b.cp-a.cp);
       const cp=arr.reduce((s,m)=>s+m.cp,0);
-      return {arr,cp};
+      // ใช้ CP รวมของก๊วนเดิมทั้งหมด (รวมคนที่จัดตี้ไปแล้ว) เป็นตัวจัดลำดับกล่อง เพื่อไม่ให้กล่องขยับเด้งไปมาเวลาลากคนออกทีละคน
+      const fullCP=g.members.filter(mm=>String(groupKey(mm))===k).reduce((s,mm)=>s+mm.cp,0);
+      return {arr,cp,fullCP};
     });
-    gunits.sort((a,b)=>b.cp-a.cp);
+    gunits.sort((a,b)=>b.fullCP-a.fullCP);
     gunits.forEach(u=>{
       const box=document.createElement("div");box.className="pgbox";
       const leader=u.arr.find(m=>m.isLeader);
@@ -2437,9 +2439,11 @@ function renderCastlePool(){
     var gunits=Object.keys(groups).map(function(k){
       var arr=groups[k].slice().sort(function(a,b){return (b.is_leader?1:0)-(a.is_leader?1:0)||b.cp-a.cp;});
       var cp=arr.reduce(function(s,m){return s+m.cp;},0);
-      return {arr:arr,cp:cp};
+      // ใช้ CP รวมของก๊วนเดิมทั้งหมด (รวมคนที่จัดตี้ไปแล้ว) เป็นตัวจัดลำดับกล่อง เพื่อไม่ให้กล่องขยับเด้งไปมาเวลาลากคนออกทีละคน
+      var fullCP=CASTLE.rows.filter(function(mm){return castleGroupKey(mm)===k;}).reduce(function(s,mm){return s+mm.cp;},0);
+      return {arr:arr,cp:cp,fullCP:fullCP};
     });
-    gunits.sort(function(a,b){return b.cp-a.cp;});
+    gunits.sort(function(a,b){return b.fullCP-a.fullCP;});
     gunits.forEach(function(u){
       var box=document.createElement("div");box.className="pgbox";
       var leader=u.arr.find(function(m){return m.is_leader;});
