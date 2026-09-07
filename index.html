@@ -490,6 +490,22 @@
   </div>
 </div>
 
+<!-- ===== popup แก้ไขตัวละครแบบเร็ว (ปุ่ม ✎ ใน list ขวาของ GvG/Castle/ตัวละครและ Party) — วางนอกหน้าที่ซ่อนได้ ไม่งั้น popup จะไม่โผล่ ===== -->
+<div id="qeOv" class="ovbg hidden">
+  <div class="ovcard">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <h3 style="margin:0;flex:1">✎ แก้ไขตัวละคร <small style="color:var(--muted)">(Quick edit)</small></h3>
+      <button class="toolbtn" onclick="quickEditClose()">✕ ปิด</button>
+    </div>
+    <label>IGN</label><input id="qe_ign">
+    <label style="margin-top:10px;display:block">อาชีพ <small style="color:var(--muted)">(Class)</small></label><select id="qe_cls"></select>
+    <label style="margin-top:10px;display:block">CP <small style="color:var(--muted)">(Combat Power)</small></label><input id="qe_cp" type="number">
+    <label class="chk" style="margin-top:12px"><input type="checkbox" id="qe_hasUlt"> ⚡ มีสกิลอัลติเมต <small style="color:var(--muted)">(Has Ultimate Skill)</small></label>
+    <div id="qe_status" class="gmeta" style="margin-top:8px"></div>
+    <button class="primary" style="width:100%;margin-top:12px" onclick="quickEditSave()">💾 บันทึก</button>
+  </div>
+</div>
+
 <!-- ===== หน้า ศึกชิงปราสาท (PIGROCKS) — หน้าตาแบบเดียวกับ GvG ลีค ===== -->
 <div id="castle" class="hidden">
   <header class="top">
@@ -565,7 +581,6 @@
 
 <!-- ===== APP ===== -->
 <div id="app" class="hidden" data-mtab="party">
-  <img id="gcover" class="gcover" alt="cover">
   <div class="fbackdrop" onclick="closeForm();closeXfer()"></div>
   <header class="top">
     <div class="glogo" id="hLogo">🐗</div>
@@ -1010,14 +1025,14 @@ function makeGroupBox(letter,color,from,to){
 }
 function updateGvgMeta(){
   const el=document.getElementById("gvgMeta");
-  if(el)el.textContent="ปาตี้ละ "+SLOTS+" • "+PARTY_COUNT+" ปาตี้ • "+GVG_LAYOUT.length+" กลุ่ม";
+  if(el)el.innerHTML=SLOTS+"/party • "+PARTY_COUNT+" parties • "+GVG_LAYOUT.length+" groups";
 }
 function buildParties(){
   loadAbsent();
   updateGvgMeta();
   const box=document.getElementById("parties");box.innerHTML="";
   if(!GVG_LAYOUT.length){
-    box.innerHTML='<div class="poolempty">— ยังไม่มีกลุ่มปาตี้ — กด "+ สร้างกลุ่มปาตี้" เพื่อเริ่มสร้างบอร์ด —</div>';
+    box.innerHTML='<div class="poolempty">— No party groups yet — click "+ สร้างกลุ่มปาตี้" to start —</div>';
     return;
   }
   const g4=document.createElement("div");g4.className="groups4";
@@ -1134,7 +1149,7 @@ function renderPool(){
   let pool=g.members.filter(m=>m.party<0).filter(match);
   const assigned=g.members.filter(m=>m.party>=0).filter(match).sort((a,b)=>a.party-b.party||a.slot-b.slot);
   const list=document.getElementById("poollist");list.innerHTML="";
-  document.getElementById("poolCount").textContent=pool.length+" รอจัด • "+assigned.length+" จัดแล้ว";
+  document.getElementById("poolCount").textContent=pool.length+" unassigned • "+assigned.length+" placed";
   document.getElementById("poolHint").classList.toggle("hidden",!IS_ADMIN);
   if(!pool.length&&!assigned.length){list.innerHTML='<div class="poolempty">— ยังไม่มีคนในลิสต์ —</div>';return;}
   // เรียงแบบเรียบเดียวตามแท็บที่เลือก (CP / ชื่อ / อาชีพ) ไม่จัดกลุ่มตามปาตี้/ก๊วนแล้ว
@@ -2178,20 +2193,36 @@ function quickDelete(ign){
     refreshCurrentPartyPage();
   });
 }
+var qeIgn=null;
 function quickEdit(ign){
   if(!IS_ADMIN)return;
   sb.from('members').select('*').eq('guild','PIGROCKS').eq('ign',ign).then(function(r){
     if(r.error||!r.data||!r.data.length){toast("โหลดข้อมูลไม่ได้");return;}
     var m=r.data[0];
-    mngEditIgn=m.ign;
-    document.getElementById("me_ign").value=m.ign;
-    var sel=document.getElementById("me_cls");
-    sel.innerHTML='<option value="">— ไม่ระบุ —</option>'+CLASSES.map(function(c){return '<option'+(c.n===m.cls?' selected':'')+'>'+c.n+'</option>';}).join("");
-    document.getElementById("me_w1").value=m.cp_w1==null?'':m.cp_w1;
-    document.getElementById("me_w2").value=m.cp_w2==null?'':m.cp_w2;
-    document.getElementById("me_w3").value=m.cp_w3==null?'':m.cp_w3;
-    document.getElementById("me_status").textContent="";
-    document.getElementById("mngEditOv").classList.remove("hidden");
+    qeIgn=m.ign;
+    document.getElementById("qe_ign").value=m.ign;
+    var sel=document.getElementById("qe_cls");
+    sel.innerHTML=CLASSES.map(function(c){return '<option'+(c.n===m.cls?' selected':'')+'>'+c.n+'</option>';}).join("");
+    document.getElementById("qe_cp").value=m.cp==null?'':m.cp;
+    document.getElementById("qe_hasUlt").checked=!!m.has_ultimate;
+    document.getElementById("qe_status").textContent="";
+    document.getElementById("qeOv").classList.remove("hidden");
+  });
+}
+function quickEditClose(){document.getElementById("qeOv").classList.add("hidden");qeIgn=null;}
+function quickEditSave(){
+  if(!IS_ADMIN||qeIgn==null)return;
+  var newIgn=document.getElementById("qe_ign").value.trim();
+  var cls=document.getElementById("qe_cls").value;
+  var cp=parseInt(document.getElementById("qe_cp").value,10)||0;
+  var hasUlt=document.getElementById("qe_hasUlt").checked;
+  if(!newIgn){toast("ใส่ชื่อก่อน");return;}
+  document.getElementById("qe_status").textContent="กำลังบันทึก...";
+  sb.from('members').update({ign:newIgn,cls:cls,cp:cp,has_ultimate:hasUlt}).eq('guild','PIGROCKS').eq('ign',qeIgn).select('ign').then(function(r){
+    if(r.error){document.getElementById("qe_status").textContent="บันทึกไม่ได้: "+r.error.message;return;}
+    toast('บันทึก "'+newIgn+'" แล้ว ✅');
+    quickEditClose();
+    refreshCurrentPartyPage();
   });
 }
 
@@ -2314,14 +2345,14 @@ function castleMakeGroupBox(letter,color,from,to){
 }
 function updateCastleMeta(){
   var el=document.getElementById("castleMeta");
-  if(el)el.textContent="ปาตี้ละ "+SLOTS+" • "+CASTLE_PARTY_COUNT+" ปาตี้ • "+CASTLE_LAYOUT.length+" กลุ่ม";
+  if(el)el.innerHTML=SLOTS+"/party • "+CASTLE_PARTY_COUNT+" parties • "+CASTLE_LAYOUT.length+" groups";
 }
 function renderCastleBoard(){
   loadCastleAbsent();
   updateCastleMeta();
   var box=document.getElementById("castleParties");box.innerHTML="";
   if(!CASTLE_LAYOUT.length){
-    box.innerHTML='<div class="poolempty">— ยังไม่มีกลุ่มปาตี้ — กด "+ สร้างกลุ่มปาตี้" เพื่อเริ่มสร้างบอร์ด —</div>';
+    box.innerHTML='<div class="poolempty">— No party groups yet — click "+ สร้างกลุ่มปาตี้" to start —</div>';
     return;
   }
   var g4=document.createElement("div");g4.className="groups4";
@@ -2386,7 +2417,7 @@ function renderCastlePool(){
   var pool=CASTLE.rows.filter(function(m){return m.castle_party==null||m.castle_party<0;}).filter(match).sort(castleCmp);
   var assigned=CASTLE.rows.filter(function(m){return m.castle_party!=null&&m.castle_party>=0;}).filter(match).sort(function(a,b){return a.castle_party-b.castle_party||a.castle_slot-b.castle_slot;});
   var list=document.getElementById("castlePoollist");list.innerHTML="";
-  document.getElementById("castlePoolCount").textContent=pool.length+" รอจัด • "+assigned.length+" จัดแล้ว";
+  document.getElementById("castlePoolCount").textContent=pool.length+" unassigned • "+assigned.length+" placed";
   if(!pool.length&&!assigned.length){list.innerHTML='<div class="poolempty">— ยังไม่มีคนในลิสต์ —</div>';return;}
   function addCastleAssigned(){
     if(!assigned.length)return;
@@ -2657,7 +2688,7 @@ function renderCastPartySolo(){
   var solo=CPARTY.rows.filter(function(m){return cpartyGroupKey(m)===null;}).filter(function(m){return !q||m.ign.toLowerCase().includes(q)||(m.cls||'').toLowerCase().includes(q);});
   solo.sort(cpartyCmp);
   var list=document.getElementById("cpartySololist");list.innerHTML="";
-  document.getElementById("cpartySoloCount").textContent=solo.length+" คนยังไม่มีปาตี้";
+  document.getElementById("cpartySoloCount").textContent=solo.length+" without a party";
   if(!solo.length){list.innerHTML='<div class="poolempty">— ทุกคนมีปาตี้แล้ว —</div>';return;}
   solo.forEach(function(m){list.appendChild(castPartyMemberEl(m,{buttons:true}));});
   if(IS_ADMIN){
