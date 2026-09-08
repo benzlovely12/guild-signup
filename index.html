@@ -527,6 +527,7 @@
         <span class="gmeta" id="castleMeta">ปาตี้ละ 5 • 0 ปาตี้ • 0 กลุ่ม</span>
         <div id="castleAdminTools" class="hidden" style="margin-left:auto;display:flex;gap:8px">
           <button class="toolbtn" onclick="addCastlePartyGroup()" title="Create a new party group">➕ สร้างกลุ่มปาตี้</button>
+          <button class="toolbtn" onclick="resetCastleAttend()" title="Reset check-in — mark everyone present again">✅ รีเซ็ตเช็คชื่อ</button>
           <button class="toolbtn" onclick="castleClearAll()" title="Clear the whole board">🧹 ล้าง</button>
         </div>
       </div>
@@ -680,6 +681,7 @@
         <span class="gmeta" id="gvgMeta">ปาตี้ละ 5 • 0 ปาตี้ • 0 กลุ่ม</span>
         <div id="adminTools" class="hidden" style="margin-left:auto;display:flex;gap:8px">
           <button class="toolbtn" onclick="addPartyGroup()" title="Create a new party group">➕ สร้างกลุ่มปาตี้</button>
+          <button class="toolbtn" onclick="resetAttend()" title="Reset check-in — mark everyone present again">✅ รีเซ็ตเช็คชื่อ</button>
           <button class="toolbtn" onclick="clearBoard()" title="Clear the whole board">🧹 ล้าง</button>
         </div>
       </div>
@@ -1081,7 +1083,7 @@ function renderSlot(slot,m){
     if(isAbsent(m))slot.classList.add("absent");else slot.classList.remove("absent");
     slot.style.borderLeftColor=groupColor(m);
     slot.innerHTML=`${IS_ADMIN?`<input type="checkbox" class="attend" ${isAbsent(m)?"":"checked"} title="ติ๊ก = มา / เอาออก = ไม่มา">`:""}${clsDotHtml(m.cls)}
-      <span class="nm">${m.isLeader?"👑":""}${m.hasUltimate?'<span class="ult" title="มีสกิลอัลติเมต (Has Ultimate Skill)">⚡</span>':""}${m.ign}</span><span class="scp">${(m.cp/1000).toFixed(0)}k</span>
+      <span class="nm">${m.hasUltimate?'<span class="ult" title="มีสกิลอัลติเมต (Has Ultimate Skill)">⚡</span>':""}${m.ign}</span><span class="scp">${(m.cp/1000).toFixed(0)}k</span>
       ${IS_ADMIN?'<button class="x">✕</button>':""}`;
     const cb=slot.querySelector(".attend");
     if(cb){cb.addEventListener("click",e=>e.stopPropagation());cb.addEventListener("change",e=>{e.stopPropagation();toggleAttend(m.ign);});}
@@ -1115,6 +1117,11 @@ function clearBoard(){
   // ล้างโครงสร้างกลุ่มปาตี้กลับเป็นว่าง ให้แอดมินเริ่มสร้างใหม่ได้
   GVG_LAYOUT=[];PARTY_COUNT=0;g.parties=[];saveGvgLayout();
   buildParties();renderPool();persist();
+}
+function resetAttend(){
+  if(!confirm('รีเซ็ตเช็คชื่อทั้งหมดกลับเป็น "มา" ทุกคน? (Reset check-in — mark everyone present again)'))return;
+  _absent=new Set(); try{localStorage.removeItem(attendKey());}catch(e){}
+  buildParties();renderPool();
 }
 
 /* ---------- pool (grouped, sortable) ---------- */
@@ -2306,7 +2313,7 @@ function renderCastleSlot(slot,m){
     if(isCastleAbsent(m))slot.classList.add("absent");else slot.classList.remove("absent");
     slot.style.borderLeftColor=classColor(m.cls);
     slot.innerHTML=(IS_ADMIN?'<input type="checkbox" class="attend" '+(isCastleAbsent(m)?"":"checked")+' title="ติ๊ก = มา / เอาออก = ไม่มา">':"")+clsDotHtml(m.cls)+
-      '<span class="nm">'+(m.is_leader?"👑":"")+(m.has_ultimate?'<span class="ult" title="มีสกิลอัลติเมต (Has Ultimate Skill)">⚡</span>':"")+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>'+
+      '<span class="nm">'+(m.has_ultimate?'<span class="ult" title="มีสกิลอัลติเมต (Has Ultimate Skill)">⚡</span>':"")+escHtml(m.ign)+'</span><span class="scp">'+(m.cp/1000).toFixed(0)+'k</span>'+
       (IS_ADMIN?'<button class="x">✕</button>':"");
     var cb=slot.querySelector(".attend");
     if(cb){cb.addEventListener("click",function(e){e.stopPropagation();});cb.addEventListener("change",function(e){e.stopPropagation();toggleCastleAttend(m.ign);});}
@@ -2481,6 +2488,12 @@ function castleClearAll(){
     rebuildCastleParties();renderCastle();
     toast("ล้างแล้ว");
   });
+}
+function resetCastleAttend(){
+  if(!IS_ADMIN)return;
+  if(!confirm('รีเซ็ตเช็คชื่อทั้งหมดกลับเป็น "มา" ทุกคน? (Reset check-in — mark everyone present again)'))return;
+  _castleAbsent=new Set(); try{localStorage.removeItem(castleAttendKey());}catch(e){}
+  renderCastle();
 }
 /* ---------- จัดบาลานซ์ CP อัตโนมัติแบบแบน สำหรับศึกชิงปราสาท (คู่ขนานกับ arrByCP ของ GvG) ---------- */
 function castleIsPriest(m){return m.cls==="Priest";}
