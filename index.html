@@ -2091,23 +2091,45 @@ function classSummaryHtml(rows){
 }
 function buildCharTable(rows,manage,avg){
   if(!rows.length) return '<div class="poolempty">— ยังไม่มีข้อมูล —</div>';
+  var showAdmin=!!IS_ADMIN;
   var h='<table class="chartbl"><thead><tr>'+
     '<th class="rk">#</th>'+ctHead('name','ชื่อตัวละคร','nm')+ctHead('cls','อาชีพ')+
     ctHead('w1','CP สัปดาห์ 1')+ctHead('d21','Δ (2-1)')+ctHead('w2','CP สัปดาห์ 2')+ctHead('d32','Δ (3-2)')+ctHead('w3','CP สัปดาห์ 3')+
-    (manage?'<th>จัดการ</th>':'')+'</tr></thead><tbody>';
+    (showAdmin?'<th>จัดการ <small style="color:var(--muted);font-weight:400">(Manage)</small></th>':'')+'</tr></thead><tbody>';
   rows.forEach(function(m,i){
     var col=classColor(m.cls);
-    h+='<tr>'+
+    h+='<tr'+(showAdmin?' data-ign="'+escHtml(m.ign)+'" data-ult="'+(m.has_ultimate?'1':'0')+'"':'')+'>'+
       '<td class="rk">'+(i+1)+'</td>'+
       '<td class="nm">'+(m.is_leader?'👑 ':'')+(m.has_ultimate?'<span class="ult" title="มีสกิลอัลติเมต (Has Ultimate Skill)">⚡ </span>':'')+escHtml(m.ign)+'</td>'+
       '<td><span class="badge" style="background:'+col+'22;color:'+col+'">'+escHtml(m.cls||'–')+'</span></td>'+
       '<td>'+fmtK(m.cp_w1)+'</td>'+diffTd(m.cp_w1,m.cp_w2,avg.d21)+
       '<td>'+fmtK(m.cp_w2)+'</td>'+diffTd(m.cp_w2,m.cp_w3,avg.d32)+
       '<td class="wk3">'+fmtK(m.cp_w3)+'</td>'+
-      (manage?'<td><button class="miniedit" onclick="mngEdit('+i+')">✎</button><button class="minidel" onclick="mngDelete('+i+')">🗑</button></td>':'')+
+      (showAdmin?'<td style="white-space:nowrap"><button class="miniedit ct-ult" title="Toggle ultimate skill">⚡</button><button class="miniedit ct-edit" title="Edit character">✎</button><button class="minidel ct-del" title="Delete character">🗑</button></td>':'')+
       '</tr>';
   });
   return h+'</tbody></table>';
+}
+function toggleUltimate(ign,cur){
+  if(!IS_ADMIN)return;
+  var next=!cur;
+  var msg=next?('ตั้งให้ "'+ign+'" มีสกิลอัลติเมต? (Mark as Has Ultimate Skill)'):('เอาสกิลอัลติเมตของ "'+ign+'" ออก? (Remove Ultimate Skill)');
+  if(!confirm(msg))return;
+  sb.from('members').update({has_ultimate:next}).eq('guild','PIGROCKS').eq('ign',ign).select('ign').then(function(r){
+    if(r.error){toast("บันทึกไม่ได้: "+r.error.message);return;}
+    toast('อัปเดต "'+ign+'" แล้ว ✅');
+    refreshCurrentPartyPage();
+  });
+}
+function bindCharTableActions(containerId){
+  if(!IS_ADMIN)return;
+  var box=document.getElementById(containerId);if(!box)return;
+  box.querySelectorAll('tr[data-ign]').forEach(function(tr){
+    var ign=tr.dataset.ign,hasUlt=tr.dataset.ult==="1";
+    var ub=tr.querySelector('.ct-ult');if(ub)ub.onclick=function(){toggleUltimate(ign,hasUlt);};
+    var eb=tr.querySelector('.ct-edit');if(eb)eb.onclick=function(){quickEdit(ign);};
+    var db=tr.querySelector('.ct-del');if(db)db.onclick=function(){quickDelete(ign);};
+  });
 }
 function renderCT(){
   var q=CT.q||'';
@@ -2122,6 +2144,7 @@ function renderCT(){
   var avg={d21:roundAvg(CT.rows,'d21'),d32:roundAvg(CT.rows,'d32')};
   var searchInfo=q?'<div class="csub" style="margin-bottom:8px">พบ '+rows.length+' คน จาก '+CT.rows.length+' คน (Found '+rows.length+' of '+CT.rows.length+')</div>':'';
   document.getElementById(CT.container).innerHTML=classSummaryHtml(CT.rows)+searchInfo+buildCharTable(rows,CT.manage,avg);
+  bindCharTableActions(CT.container);
 }
 function renderCharTable(rows,manage,container){
   CT={rows:rows,manage:manage,container:container,key:'latest',dir:'desc',q:''};
@@ -2188,10 +2211,12 @@ function mngEditSave(){
 }
 /* ---------- แก้ไข/ลบตัวละครแบบเร็ว ใช้ร่วมกันได้ทุกหน้า (list ด้านขวาของ GvG/Castle/ตัวละครและ Party) ---------- */
 function refreshCurrentPartyPage(){
-  var appEl=document.getElementById("app"),castleEl=document.getElementById("castle"),cpEl=document.getElementById("castparty");
+  var appEl=document.getElementById("app"),castleEl=document.getElementById("castle"),cpEl=document.getElementById("castparty"),progEl=document.getElementById("prog"),mngEl=document.getElementById("mng");
   if(appEl&&!appEl.classList.contains("hidden"))loadGuild(G().key,true);
   if(castleEl&&!castleEl.classList.contains("hidden"))loadCastle();
   if(cpEl&&!cpEl.classList.contains("hidden"))loadCastParty();
+  if(progEl&&!progEl.classList.contains("hidden"))openProgress();
+  if(mngEl&&!mngEl.classList.contains("hidden"))loadMng();
 }
 function quickDelete(ign){
   if(!IS_ADMIN)return;
@@ -2707,7 +2732,8 @@ function renderCastPartySolo(){
   var list=document.getElementById("cpartySololist");list.innerHTML="";
   document.getElementById("cpartySoloCount").textContent=solo.length+" without a party";
   if(!solo.length){list.innerHTML='<div class="poolempty">— ทุกคนมีปาตี้แล้ว —</div>';return;}
-  solo.forEach(function(m){list.appendChild(castPartyMemberEl(m,{buttons:true}));});
+  // หน้านี้ไว้ดูใครมากับใคร + ลากจัดปาตี้เท่านั้น ไม่มีปุ่มแก้ไข/ลบแล้ว (แก้ไขข้อมูลตัวละครทำได้ที่หน้า "การพัฒนาตัวละคร" แทน)
+  solo.forEach(function(m){list.appendChild(castPartyMemberEl(m,{buttons:false}));});
   if(IS_ADMIN){
     list.ondragover=function(e){e.preventDefault();};
     list.ondrop=function(e){
