@@ -97,6 +97,11 @@
   .party h4{margin:0 0 8px;font-size:13px;display:flex;align-items:center;gap:6px}
   .party h4 .pname{font-weight:800}
   .party h4 .cp{margin-left:auto;color:var(--gold);font-weight:800;font-size:12px}
+  .party h4[draggable=true]{cursor:grab}
+  .party.pdrag{opacity:.45}
+  .party.pdrop{outline:2px dashed var(--g);outline-offset:2px}
+  .groupbox.gdrop{box-shadow:0 0 0 3px color-mix(in srgb,var(--gc,#2a3252) 45%,transparent)}
+  .gaddp{padding:3px 10px!important;font-size:12px!important}
   .slot{display:flex;align-items:center;gap:8px;background:var(--slot);border:1px dashed #38416a;border-radius:8px;padding:6px 8px;margin-bottom:6px;min-height:40px;border-left-width:4px}
   .slot:last-child{margin-bottom:0}
   .slot.over{background:#26406e;border-color:var(--g);border-style:solid}
@@ -1097,11 +1102,62 @@ const GROUP_COLORS=["#ff6a4d","#ffd35c","#22c1ff","#c084fc","#3ee0a0","#ff9cc0",
 // ตัวอักษรกลุ่มไม่จำกัดจำนวน: A..Z แล้วต่อ AA,AB,... แบบคอลัมน์สเปรดชีต
 function letterFor(i){let s="",n=i+1;while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26);}return s;}
 function colorFor(i){return GROUP_COLORS[i%GROUP_COLORS.length];}
+/* ---------- เพิ่มปาตี้ในกลุ่ม / ลากย้ายทั้งตี้ข้ามกลุ่ม (ใช้ร่วม GvG + Castle) ----------
+   layout = [จำนวนปาตี้ต่อกลุ่ม], parties = array ปาตี้แบบแบน (เรียงตามกลุ่ม) */
+function groupOfParty(layout,pi){let from=0;for(let gi=0;gi<layout.length;gi++){if(pi<from+layout[gi])return gi;from+=layout[gi];}return -1;}
+function groupEnd(layout,gi){let s=0;for(let i=0;i<=gi;i++)s+=layout[i];return s;}
+function boardAddParty(layout,parties,gi){
+  parties.splice(groupEnd(layout,gi),0,Array(SLOTS).fill(null));
+  layout[gi]++;
+  return true;
+}
+// beforePi != null → แทรกก่อนปาตี้นั้น (อยู่กลุ่มเดียวกับปาตี้นั้น) / null → ต่อท้ายกลุ่ม tgi
+function boardMoveParty(layout,parties,pi,tgi,beforePi){
+  const sgi=groupOfParty(layout,pi);
+  if(sgi<0)return false;
+  if(beforePi!=null){
+    if(beforePi===pi)return false;
+    const bgi=groupOfParty(layout,beforePi);
+    if(bgi<0)return false;
+    if(beforePi===pi+1&&bgi===sgi)return false;
+    tgi=bgi;
+  }else{
+    if(tgi==null||tgi<0||tgi>=layout.length)return false;
+    if(tgi===sgi&&pi===groupEnd(layout,sgi)-1)return false;
+  }
+  const row=parties.splice(pi,1)[0];
+  layout[sgi]--;
+  const at=beforePi!=null?(beforePi>pi?beforePi-1:beforePi):groupEnd(layout,tgi);
+  parties.splice(at,0,row);
+  layout[tgi]++;
+  return true;
+}
+let dragPartyIdx=null;
+function bindPartyDrag(el,pi,onDrop){
+  const h=el.querySelector("h4");
+  h.draggable=true;h.title="Drag to move this whole party to another group";
+  h.addEventListener("dragstart",e=>{dragPartyIdx=pi;el.classList.add("pdrag");try{e.dataTransfer.setData("text/plain","party");e.dataTransfer.effectAllowed="move";}catch(x){}});
+  h.addEventListener("dragend",()=>{dragPartyIdx=null;el.classList.remove("pdrag");document.querySelectorAll(".pdrop,.gdrop").forEach(x=>x.classList.remove("pdrop","gdrop"));});
+  el.addEventListener("dragover",e=>{if(dragPartyIdx==null)return;e.stopPropagation();if(dragPartyIdx===pi)return;e.preventDefault();el.classList.add("pdrop");});
+  el.addEventListener("dragleave",e=>{if(!el.contains(e.relatedTarget))el.classList.remove("pdrop");});
+  el.addEventListener("drop",e=>{if(dragPartyIdx==null)return;e.preventDefault();e.stopPropagation();el.classList.remove("pdrop");onDrop(null,pi);});
+}
+function bindGroupDrop(gb,gi,onDrop){
+  gb.addEventListener("dragover",e=>{if(dragPartyIdx==null)return;e.preventDefault();gb.classList.add("gdrop");});
+  gb.addEventListener("dragleave",e=>{if(!gb.contains(e.relatedTarget))gb.classList.remove("gdrop");});
+  gb.addEventListener("drop",e=>{if(dragPartyIdx==null)return;e.preventDefault();gb.classList.remove("gdrop");onDrop(gi,null);});
+}
+function addGroupPartyBtn(lab,onClick){
+  const b=document.createElement("button");b.className="toolbtn gaddp";b.textContent="＋ Party";b.title="Add an empty party to this group";
+  b.addEventListener("click",e=>{e.stopPropagation();onClick();});
+  lab.appendChild(b);
+}
 function makeParty(pi){
   const g=G(),p=g.parties[pi];
   const cp=p.reduce((s,m)=>s+(m?m.cp:0),0);
   const el=document.createElement("div");el.className="party";
   el.innerHTML=`<h4><span class="pname">Party ${pi+1}</span><span class="cp">${(cp/1000).toFixed(0)}k</span></h4>`;
+  if(IS_ADMIN)bindPartyDrag(el,pi,dropParty);
   for(let si=0;si<SLOTS;si++){
     const slot=document.createElement("div");slot.className="slot";slot.dataset.p=pi;slot.dataset.s=si;
     renderSlot(slot,p[si]);
@@ -1115,10 +1171,11 @@ function makeParty(pi){
   return el;
 }
 function sumCP(from,to){const g=G();let s=0;for(let pi=from;pi<to;pi++)g.parties[pi].forEach(m=>{if(m)s+=m.cp;});return s;}
-function makeGroupBox(letter,color,from,to){
+function makeGroupBox(letter,color,from,to,gi){
   const gb=document.createElement("div");gb.className="groupbox";gb.style.setProperty("--gc",color);
   const lab=document.createElement("div");lab.className="glabel";lab.style.color=color;
   lab.innerHTML=`กลุ่ม ${letter} <small style="opacity:.75;font-weight:600">Group ${letter}</small><span class="gcp">${(sumCP(from,to)/1000).toFixed(0)}k</span>`;
+  if(IS_ADMIN){addGroupPartyBtn(lab,()=>addPartyToGroup(gi));bindGroupDrop(gb,gi,dropParty);}
   gb.appendChild(lab);
   const gp=document.createElement("div");gp.className="gparties";
   for(let pi=from;pi<to;pi++)gp.appendChild(makeParty(pi));
@@ -1141,10 +1198,27 @@ function buildParties(){
   let from=0;
   GVG_LAYOUT.forEach((count,gi)=>{
     const to=from+count;
-    g4.appendChild(makeGroupBox(letterFor(gi),colorFor(gi),from,to));
+    g4.appendChild(makeGroupBox(letterFor(gi),colorFor(gi),from,to,gi));
     from=to;
   });
   box.appendChild(g4);
+}
+function gvgAfterReorder(){
+  const g=G();
+  PARTY_COUNT=GVG_LAYOUT.reduce(function(s,n){return s+n;},0);
+  g.parties.forEach((row,pi)=>row.forEach((m,si)=>{if(m){m.party=pi;m.slot=si;}}));
+  saveGvgLayout();buildParties();renderPool();persist();
+}
+function addPartyToGroup(gi){
+  if(!IS_ADMIN)return;
+  boardAddParty(GVG_LAYOUT,G().parties,gi);
+  gvgAfterReorder();
+  toast('เพิ่มปาตี้ในกลุ่ม '+letterFor(gi)+' แล้ว');
+}
+function dropParty(tgi,beforePi){
+  if(!IS_ADMIN||dragPartyIdx==null)return;
+  const pi=dragPartyIdx;dragPartyIdx=null;
+  if(boardMoveParty(GVG_LAYOUT,G().parties,pi,tgi,beforePi)){gvgAfterReorder();toast('ย้ายปาตี้แล้ว');}
 }
 /* ---------- โครงสร้างกลุ่มปาตี้แบบกำหนดเอง (เซฟลง Supabase ให้ทุกคนเห็นตรงกัน) ---------- */
 function loadGvgLayout(){
@@ -2455,6 +2529,7 @@ function castleMakeParty(pi){
   var cp=p.reduce(function(s,m){return s+(m?m.cp:0);},0);
   var el=document.createElement("div");el.className="party";
   el.innerHTML='<h4><span class="pname">Party '+(pi+1)+'</span><span class="cp">'+(cp/1000).toFixed(0)+'k</span></h4>';
+  if(IS_ADMIN)bindPartyDrag(el,pi,castleDropParty);
   for(var si=0;si<SLOTS;si++){
     var slot=document.createElement("div");slot.className="slot";slot.dataset.p=pi;slot.dataset.s=si;
     renderCastleSlot(slot,p[si]);
@@ -2468,10 +2543,11 @@ function castleMakeParty(pi){
   }
   return el;
 }
-function castleMakeGroupBox(letter,color,from,to){
+function castleMakeGroupBox(letter,color,from,to,gi){
   var gb=document.createElement("div");gb.className="groupbox";gb.style.setProperty("--gc",color);
   var lab=document.createElement("div");lab.className="glabel";lab.style.color=color;
   lab.innerHTML='กลุ่ม '+letter+' <small style="opacity:.75;font-weight:600">Group '+letter+'</small><span class="gcp">'+(castleSumCP(from,to)/1000).toFixed(0)+'k</span>';
+  if(IS_ADMIN){addGroupPartyBtn(lab,function(){castleAddPartyToGroup(gi);});bindGroupDrop(gb,gi,castleDropParty);}
   gb.appendChild(lab);
   var gp=document.createElement("div");gp.className="gparties";
   for(var pi=from;pi<to;pi++)gp.appendChild(castleMakeParty(pi));
@@ -2494,10 +2570,34 @@ function renderCastleBoard(){
   var from=0;
   CASTLE_LAYOUT.forEach(function(count,gi){
     var to=from+count;
-    g4.appendChild(castleMakeGroupBox(letterFor(gi),colorFor(gi),from,to));
+    g4.appendChild(castleMakeGroupBox(letterFor(gi),colorFor(gi),from,to,gi));
     from=to;
   });
   box.appendChild(g4);
+}
+function castleApplyReorder(fn){
+  var before={};CASTLE.rows.forEach(function(m){before[m.ign]=m.castle_party;});
+  if(!fn())return false;
+  CASTLE_PARTY_COUNT=CASTLE_LAYOUT.reduce(function(s,n){return s+n;},0);
+  CASTLE.parties.forEach(function(row,pi){row.forEach(function(m,si){if(m){m.castle_party=pi;m.castle_slot=si;}});});
+  var changed=CASTLE.rows.filter(function(m){return m.castle_party!==before[m.ign];});
+  saveCastleLayout();renderCastleBoard();renderCastlePool();
+  var chunks=[];for(var i=0;i<changed.length;i+=12)chunks.push(changed.slice(i,i+12));
+  (function next(i){
+    if(i>=chunks.length)return;
+    Promise.all(chunks[i].map(function(m){return sb.from('members').update({castle_party:m.castle_party,castle_slot:m.castle_slot}).eq('guild','PIGROCKS').eq('ign',m.ign);}))
+      .then(function(){next(i+1);});
+  })(0);
+  return true;
+}
+function castleAddPartyToGroup(gi){
+  if(!IS_ADMIN)return;
+  if(castleApplyReorder(function(){return boardAddParty(CASTLE_LAYOUT,CASTLE.parties,gi);}))toast('เพิ่มปาตี้ในกลุ่ม '+letterFor(gi)+' แล้ว');
+}
+function castleDropParty(tgi,beforePi){
+  if(!IS_ADMIN||dragPartyIdx==null)return;
+  var pi=dragPartyIdx;dragPartyIdx=null;
+  if(castleApplyReorder(function(){return boardMoveParty(CASTLE_LAYOUT,CASTLE.parties,pi,tgi,beforePi);}))toast('ย้ายปาตี้แล้ว');
 }
 function castleCmp(a,b){return CASTLE.sortBy==="cp"||CASTLE.sortBy==="party"?b.cp-a.cp:CASTLE.sortBy==="name"?a.ign.localeCompare(b.ign):(a.cls||'').localeCompare(b.cls||'')||b.cp-a.cp;}
 function setCastleSort(s){CASTLE.sortBy=s;document.querySelectorAll('.chip[data-cs]').forEach(function(c){c.classList.toggle('on',c.dataset.cs===s);});renderCastlePool();}
