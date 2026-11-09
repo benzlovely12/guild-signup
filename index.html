@@ -31,6 +31,9 @@
   .clsdot.plus::before,.clsdot.plus::after{content:"";position:absolute;background:var(--dc);border-radius:1px}
   .clsdot.plus::before{left:50%;top:0;bottom:0;width:2.4px;transform:translateX(-50%)}
   .clsdot.plus::after{top:50%;left:0;right:0;height:2.4px;transform:translateY(-50%)}
+  .clsdot.book{width:13px;height:10px;min-width:13px;border-radius:2px 2px 3px 3px;background:none!important;border:2px solid var(--dc);position:relative}
+  .clsdot.book::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;background:var(--dc);transform:translateX(-50%)}
+  .clschip .clsdot.book{width:11px;height:8px;min-width:11px;border-width:1.5px}
   .clssum{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px}
   .clssum-total{font-size:12px;font-weight:800;color:var(--muted);margin-right:2px}
   .clschip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px 4px 8px;border-radius:20px;border:1px solid}
@@ -883,6 +886,7 @@ function isPriestCls(n){return n==="Priest"||n==="High Priest"}
 function clsDotHtml(cls,title){
   const c=classColor(cls),t=escHtml(title||cls||"");
   if(isPriestCls(cls))return `<span class="clsdot plus" style="--dc:${c}" title="${t}"></span>`;
+  if(cls==="Scholar"||cls==="Sage")return `<span class="clsdot book" style="--dc:${c}" title="${t}"></span>`;
   return `<span class="clsdot" style="background:${c}" title="${t}"></span>`;
 }
 function groupKey(m){return m.isLeader?m.id:(m.leaderId||null)}
