@@ -102,6 +102,9 @@
   .party.pdrop{outline:2px dashed var(--g);outline-offset:2px}
   .groupbox.gdrop{box-shadow:0 0 0 3px color-mix(in srgb,var(--gc,#2a3252) 45%,transparent)}
   .gaddp{padding:3px 10px!important;font-size:12px!important}
+  .party.plocked{border-color:var(--gold)}
+  .party.plocked .slot .x{display:none}
+  .lockby{font-size:11px;color:var(--gold);font-weight:700;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .slot{display:flex;align-items:center;gap:8px;background:var(--slot);border:1px dashed #38416a;border-radius:8px;padding:6px 8px;margin-bottom:6px;min-height:40px;border-left-width:4px}
   .slot:last-child{margin-bottom:0}
   .slot.over{background:#26406e;border-color:var(--g);border-style:solid}
@@ -742,6 +745,7 @@ const DISCORD_WEBHOOK_URL = ""; // (ไม่บังคับ) วาง webho
 const IS_ADMIN=/[?&]admin\b/.test(location.search);
 const ADMIN_TOKEN="admin";
 let PARTY_COUNT=0; const SLOTS=5;
+let GVG_LOCKS=[]; // ล็อกปาตี้ ขนานกับ parties: null หรือ {by:ชื่อคนล็อก,at:เวลา} (เซฟลง board_layout id='gvg_locks')
 let GVG_LAYOUT=[]; // array ของจำนวนปาตี้ต่อกลุ่ม เช่น [5,7,3] = กลุ่ม A 5 ตี้, B 7 ตี้, C 3 ตี้ (กำหนดเองโดยแอดมิน, เซฟลง Supabase)
 /* สีตามสายอาชีพ: นักดาบ=แดง, นักเวท=น้ำเงิน, นักธนู=เหลือง, นักพระ=เขียว,
    โจร=ม่วง, พ่อค้า=เขียวแกมน้ำเงิน, ปืน=น้ำตาล, ดูอิด=เขียวเข้ม
@@ -1106,13 +1110,17 @@ function colorFor(i){return GROUP_COLORS[i%GROUP_COLORS.length];}
    layout = [จำนวนปาตี้ต่อกลุ่ม], parties = array ปาตี้แบบแบน (เรียงตามกลุ่ม) */
 function groupOfParty(layout,pi){let from=0;for(let gi=0;gi<layout.length;gi++){if(pi<from+layout[gi])return gi;from+=layout[gi];}return -1;}
 function groupEnd(layout,gi){let s=0;for(let i=0;i<=gi;i++)s+=layout[i];return s;}
-function boardAddParty(layout,parties,gi){
-  parties.splice(groupEnd(layout,gi),0,Array(SLOTS).fill(null));
+/* locks = array ขนานกับ parties (locks[pi] = null หรือ {by,at}) — ต้อง splice พร้อมกันเสมอ ไม่งั้นล็อกจะเลื่อนผิดตี้ */
+function padLocks(locks,n){while(locks.length<n)locks.push(null);if(locks.length>n)locks.length=n;return locks;}
+function boardAddParty(layout,parties,gi,locks){
+  const at=groupEnd(layout,gi);
+  if(locks){padLocks(locks,parties.length);locks.splice(at,0,null);}
+  parties.splice(at,0,Array(SLOTS).fill(null));
   layout[gi]++;
   return true;
 }
 // beforePi != null → แทรกก่อนปาตี้นั้น (อยู่กลุ่มเดียวกับปาตี้นั้น) / null → ต่อท้ายกลุ่ม tgi
-function boardMoveParty(layout,parties,pi,tgi,beforePi){
+function boardMoveParty(layout,parties,pi,tgi,beforePi,locks){
   const sgi=groupOfParty(layout,pi);
   if(sgi<0)return false;
   if(beforePi!=null){
@@ -1125,20 +1133,48 @@ function boardMoveParty(layout,parties,pi,tgi,beforePi){
     if(tgi==null||tgi<0||tgi>=layout.length)return false;
     if(tgi===sgi&&pi===groupEnd(layout,sgi)-1)return false;
   }
+  if(locks)padLocks(locks,parties.length);
   const row=parties.splice(pi,1)[0];
+  const lk=locks?locks.splice(pi,1)[0]:null;
   layout[sgi]--;
   const at=beforePi!=null?(beforePi>pi?beforePi-1:beforePi):groupEnd(layout,tgi);
   parties.splice(at,0,row);
+  if(locks)locks.splice(at,0,lk);
   layout[tgi]++;
   return true;
 }
 // ลบปาตี้ทั้งตี้ออกจากกลุ่ม — คืนสมาชิกในตี้กลับไปไม่ได้จัด (ผู้เรียกต้องเคลียร์ตำแหน่งของสมาชิกเอง)
-function boardRemoveParty(layout,parties,pi){
+function boardRemoveParty(layout,parties,pi,locks){
   const gi=groupOfParty(layout,pi);
   if(gi<0)return false;
+  if(locks){padLocks(locks,parties.length);locks.splice(pi,1);}
   parties.splice(pi,1);
   layout[gi]--;
   return true;
+}
+function askLocker(){
+  var d='';try{d=localStorage.getItem('lockerName')||'';}catch(e){}
+  var v=prompt('ใส่ชื่อคนที่ lock ปาตี้นี้ (Your name)',d);
+  if(v===null)return null;
+  var n=v.trim();
+  if(!n){toast('ต้องใส่ชื่อคน lock ก่อน');return null;}
+  try{localStorage.setItem('lockerName',n);}catch(e){}
+  return n;
+}
+function addPartyLockUI(el,pi,lock,onToggle){
+  const h=el.querySelector("h4"),cp=h.querySelector(".cp");
+  if(lock){
+    el.classList.add("plocked");
+    const s=document.createElement("span");s.className="lockby";s.textContent="🔒 "+lock.by;s.title="Locked by "+lock.by;
+    h.insertBefore(s,cp);
+  }
+  if(IS_ADMIN){
+    const b=document.createElement("button");b.className="toolbtn gaddp";b.textContent=lock?"🔓":"🔒";
+    b.title=lock?"Unlock this party (locked by "+lock.by+")":"Lock this party";
+    b.style.cssText="padding:1px 7px!important";
+    b.addEventListener("click",e=>{e.stopPropagation();onToggle(pi);});
+    h.insertBefore(b,cp);
+  }
 }
 function addPartyDelBtn(el,pi,onClick){
   const b=document.createElement("button");b.className="toolbtn gaddp";b.textContent="🗑";b.title="Delete this whole party (members go back to unassigned)";
@@ -1150,7 +1186,7 @@ let dragPartyIdx=null;
 function bindPartyDrag(el,pi,onDrop){
   const h=el.querySelector("h4");
   h.draggable=true;h.title="Drag to move this whole party to another group";
-  h.addEventListener("dragstart",e=>{dragPartyIdx=pi;el.classList.add("pdrag");try{e.dataTransfer.setData("text/plain","party");e.dataTransfer.effectAllowed="move";}catch(x){}});
+  h.addEventListener("dragstart",e=>{if(el.classList.contains("plocked")){e.preventDefault();toast("ปาตี้นี้ถูกล็อกอยู่ 🔒 ปลดล็อกก่อน");return;}dragPartyIdx=pi;el.classList.add("pdrag");try{e.dataTransfer.setData("text/plain","party");e.dataTransfer.effectAllowed="move";}catch(x){}});
   h.addEventListener("dragend",()=>{dragPartyIdx=null;el.classList.remove("pdrag");document.querySelectorAll(".pdrop,.gdrop").forEach(x=>x.classList.remove("pdrop","gdrop"));});
   el.addEventListener("dragover",e=>{if(dragPartyIdx==null)return;e.stopPropagation();if(dragPartyIdx===pi)return;e.preventDefault();el.classList.add("pdrop");});
   el.addEventListener("dragleave",e=>{if(!el.contains(e.relatedTarget))el.classList.remove("pdrop");});
@@ -1171,6 +1207,7 @@ function makeParty(pi){
   const cp=p.reduce((s,m)=>s+(m?m.cp:0),0);
   const el=document.createElement("div");el.className="party";
   el.innerHTML=`<h4><span class="pname">Party ${pi+1}</span><span class="cp">${(cp/1000).toFixed(0)}k</span></h4>`;
+  addPartyLockUI(el,pi,GVG_LOCKS[pi],toggleLockGvg);
   if(IS_ADMIN){bindPartyDrag(el,pi,dropParty);addPartyDelBtn(el,pi,deletePartyGvg);}
   for(let si=0;si<SLOTS;si++){
     const slot=document.createElement("div");slot.className="slot";slot.dataset.p=pi;slot.dataset.s=si;
@@ -1221,28 +1258,30 @@ function gvgAfterReorder(){
   const g=G();
   PARTY_COUNT=GVG_LAYOUT.reduce(function(s,n){return s+n;},0);
   g.parties.forEach((row,pi)=>row.forEach((m,si)=>{if(m){m.party=pi;m.slot=si;}}));
-  saveGvgLayout();buildParties();renderPool();persist();
+  saveGvgLayout();saveGvgLocks();buildParties();renderPool();persist();
 }
 function addPartyToGroup(gi){
   if(!IS_ADMIN)return;
-  boardAddParty(GVG_LAYOUT,G().parties,gi);
+  boardAddParty(GVG_LAYOUT,G().parties,gi,GVG_LOCKS);
   gvgAfterReorder();
   toast('เพิ่มปาตี้ในกลุ่ม '+letterFor(gi)+' แล้ว');
 }
 function deletePartyGvg(pi){
   if(!IS_ADMIN)return;
   const row=G().parties[pi];if(!row)return;
+  if(isLockedG(pi)){toast('ปาตี้นี้ถูกล็อกโดย '+GVG_LOCKS[pi].by+' 🔒 ปลดล็อกก่อน');return;}
   const n=row.filter(Boolean).length;
   if(!confirm('ลบ Party '+(pi+1)+' ทั้งตี้?'+(n?(' ('+n+' คนในตี้จะกลับไปอยู่รายชื่อที่ยังไม่ได้จัด)'):'')))return;
   row.forEach(m=>{if(m){m.party=-1;m.slot=-1;}});
-  boardRemoveParty(GVG_LAYOUT,G().parties,pi);
+  boardRemoveParty(GVG_LAYOUT,G().parties,pi,GVG_LOCKS);
   gvgAfterReorder();
   toast('ลบปาตี้แล้ว');
 }
 function dropParty(tgi,beforePi){
   if(!IS_ADMIN||dragPartyIdx==null)return;
   const pi=dragPartyIdx;dragPartyIdx=null;
-  if(boardMoveParty(GVG_LAYOUT,G().parties,pi,tgi,beforePi)){gvgAfterReorder();toast('ย้ายปาตี้แล้ว');}
+  if(isLockedG(pi)){toast('ปาตี้นี้ถูกล็อกอยู่ 🔒');return;}
+  if(boardMoveParty(GVG_LAYOUT,G().parties,pi,tgi,beforePi,GVG_LOCKS)){gvgAfterReorder();toast('ย้ายปาตี้แล้ว');}
 }
 /* ---------- โครงสร้างกลุ่มปาตี้แบบกำหนดเอง (เซฟลง Supabase ให้ทุกคนเห็นตรงกัน) ---------- */
 function loadGvgLayout(){
@@ -1250,7 +1289,29 @@ function loadGvgLayout(){
   return sb.from('board_layout').select('groups').eq('id','gvg').maybeSingle().then(function(r){
     GVG_LAYOUT=(r.data&&Array.isArray(r.data.groups))?r.data.groups:[];
     PARTY_COUNT=GVG_LAYOUT.reduce(function(s,n){return s+n;},0);
-  }).catch(function(){GVG_LAYOUT=[];PARTY_COUNT=0;});
+    return sb.from('board_layout').select('groups').eq('id','gvg_locks').maybeSingle().then(function(r2){
+      GVG_LOCKS=padLocks((r2.data&&Array.isArray(r2.data.groups))?r2.data.groups.map(function(x){return x&&x.by?x:null;}):[],PARTY_COUNT);
+    });
+  }).catch(function(){GVG_LAYOUT=[];PARTY_COUNT=0;GVG_LOCKS=[];});
+}
+function saveGvgLocks(){
+  if(!sb)return;
+  sb.from('board_layout').upsert({id:'gvg_locks',groups:padLocks(GVG_LOCKS,PARTY_COUNT)}).then(function(r){
+    if(r.error)toast("เซฟสถานะล็อกไม่ได้: "+r.error.message);
+  });
+}
+function isLockedG(pi){return !!(GVG_LOCKS[pi]&&GVG_LOCKS[pi].by);}
+function toggleLockGvg(pi){
+  if(!IS_ADMIN)return;
+  padLocks(GVG_LOCKS,PARTY_COUNT);
+  if(GVG_LOCKS[pi]){
+    if(!confirm('ปลดล็อก Party '+(pi+1)+'? (ล็อกโดย '+GVG_LOCKS[pi].by+')'))return;
+    GVG_LOCKS[pi]=null;
+  }else{
+    var by=askLocker();if(!by)return;
+    GVG_LOCKS[pi]={by:by,at:Date.now()};
+  }
+  saveGvgLocks();buildParties();
 }
 function saveGvgLayout(){
   if(!sb)return;
@@ -1286,7 +1347,7 @@ function renderSlot(slot,m){
     const cb=slot.querySelector(".attend");
     if(cb){cb.addEventListener("click",e=>e.stopPropagation());cb.addEventListener("change",e=>{e.stopPropagation();toggleAttend(m.ign);});}
     const x=slot.querySelector(".x");
-    if(x)x.onclick=e=>{e.stopPropagation();const m2=G().parties[+slot.dataset.p][+slot.dataset.s];if(m2){m2.party=-1;m2.slot=-1;}G().parties[+slot.dataset.p][+slot.dataset.s]=null;buildParties();renderPool();persist();};
+    if(x)x.onclick=e=>{e.stopPropagation();if(isLockedG(+slot.dataset.p)){toast('ปาตี้ถูกล็อกอยู่ 🔒');return;}const m2=G().parties[+slot.dataset.p][+slot.dataset.s];if(m2){m2.party=-1;m2.slot=-1;}G().parties[+slot.dataset.p][+slot.dataset.s]=null;buildParties();renderPool();persist();};
   }else{
     slot.style.borderLeftColor="#38416a";
     slot.innerHTML=`<span class="empty-t">— ว่าง —</span>`;
@@ -1296,6 +1357,7 @@ let dragId=null,selectedId=null;
 function dropTo(pi,si){
   if(!IS_ADMIN||dragId==null)return;const g=G();
   const m=memberById(dragId);if(!m)return;
+  if(isLockedG(pi)||(m.party>=0&&isLockedG(m.party))){dragId=null;toast('ปาตี้ถูกล็อกอยู่ 🔒 ปลดล็อกก่อนถึงจะแก้ได้');return;}
   const p=g.parties[pi];
   // ลากทีละคน ไม่ยกทั้งก๊วนอีกต่อไป
   if(m.party>=0){g.parties[m.party][m.slot]=null;m.party=-1;m.slot=-1;}
@@ -1307,6 +1369,7 @@ function dropTo(pi,si){
   buildParties();renderPool();persist();
 }
 function clearBoard(){
+  if(GVG_LOCKS.some(function(x){return x&&x.by;})){toast('มีปาตี้ที่ถูกล็อกอยู่ 🔒 ปลดล็อกทั้งหมดก่อนถึงจะล้างได้');return;}
   if(!confirm("ล้างปาตี้ทั้งหมด รวมถึงโครงสร้างกลุ่ม A/B/C.../ ของกิลด์นี้? (บันทึกทันที ย้อนไม่ได้ ต้องกด \"+ สร้างกลุ่มปาตี้\" ใหม่)"))return;
   boardMode="";srv("setBoardMode",G().key,"").catch(function(){});
   const g=G();g.parties.forEach((p,pi)=>p.forEach((m,si)=>{if(m){m.party=-1;m.slot=-1;p[si]=null;}}));
@@ -2465,6 +2528,7 @@ function quickEditSave(){
    จัดเอง (ลาก/กดเลือกแล้วแตะช่อง) ไม่มีปุ่มจัดอัตโนมัติ ============================= */
 var CASTLE={rows:[],parties:[],sortBy:'cp'};
 var castleDragId=null,castleSelectedId=null;
+var CASTLE_LOCKS=[]; // เหมือน GVG_LOCKS แต่ของศึกชิงปราสาท (board_layout id='castle_locks')
 var CASTLE_LAYOUT=[],CASTLE_PARTY_COUNT=0; // โครงสร้างกลุ่มปาตี้ของศึกชิงปราสาท แยกจาก GvG แต่กลไกเดียวกัน
 function openCastle(){
   pageShow("castle");
@@ -2485,7 +2549,29 @@ function loadCastleLayout(){
   return sb.from('board_layout').select('groups').eq('id','castle').maybeSingle().then(function(r){
     CASTLE_LAYOUT=(r.data&&Array.isArray(r.data.groups))?r.data.groups:[];
     CASTLE_PARTY_COUNT=CASTLE_LAYOUT.reduce(function(s,n){return s+n;},0);
-  }).catch(function(){CASTLE_LAYOUT=[];CASTLE_PARTY_COUNT=0;});
+    return sb.from('board_layout').select('groups').eq('id','castle_locks').maybeSingle().then(function(r2){
+      CASTLE_LOCKS=padLocks((r2.data&&Array.isArray(r2.data.groups))?r2.data.groups.map(function(x){return x&&x.by?x:null;}):[],CASTLE_PARTY_COUNT);
+    });
+  }).catch(function(){CASTLE_LAYOUT=[];CASTLE_PARTY_COUNT=0;CASTLE_LOCKS=[];});
+}
+function saveCastleLocks(){
+  if(!sb)return;
+  sb.from('board_layout').upsert({id:'castle_locks',groups:padLocks(CASTLE_LOCKS,CASTLE_PARTY_COUNT)}).then(function(r){
+    if(r.error)toast("เซฟสถานะล็อกไม่ได้: "+r.error.message);
+  });
+}
+function isLockedC(pi){return !!(CASTLE_LOCKS[pi]&&CASTLE_LOCKS[pi].by);}
+function castleToggleLock(pi){
+  if(!IS_ADMIN)return;
+  padLocks(CASTLE_LOCKS,CASTLE_PARTY_COUNT);
+  if(CASTLE_LOCKS[pi]){
+    if(!confirm('ปลดล็อก Party '+(pi+1)+'? (ล็อกโดย '+CASTLE_LOCKS[pi].by+')'))return;
+    CASTLE_LOCKS[pi]=null;
+  }else{
+    var by=askLocker();if(!by)return;
+    CASTLE_LOCKS[pi]={by:by,at:Date.now()};
+  }
+  saveCastleLocks();renderCastleBoard();
 }
 function saveCastleLayout(){
   if(!sb)return;
@@ -2553,6 +2639,7 @@ function castleMakeParty(pi){
   var cp=p.reduce(function(s,m){return s+(m?m.cp:0);},0);
   var el=document.createElement("div");el.className="party";
   el.innerHTML='<h4><span class="pname">Party '+(pi+1)+'</span><span class="cp">'+(cp/1000).toFixed(0)+'k</span></h4>';
+  addPartyLockUI(el,pi,CASTLE_LOCKS[pi],castleToggleLock);
   if(IS_ADMIN){bindPartyDrag(el,pi,castleDropParty);addPartyDelBtn(el,pi,castleDeleteParty);}
   for(var si=0;si<SLOTS;si++){
     var slot=document.createElement("div");slot.className="slot";slot.dataset.p=pi;slot.dataset.s=si;
@@ -2605,7 +2692,7 @@ function castleApplyReorder(fn){
   CASTLE_PARTY_COUNT=CASTLE_LAYOUT.reduce(function(s,n){return s+n;},0);
   CASTLE.parties.forEach(function(row,pi){row.forEach(function(m,si){if(m){m.castle_party=pi;m.castle_slot=si;}});});
   var changed=CASTLE.rows.filter(function(m){return m.castle_party!==before[m.ign];});
-  saveCastleLayout();renderCastleBoard();renderCastlePool();
+  saveCastleLayout();saveCastleLocks();renderCastleBoard();renderCastlePool();
   var chunks=[];for(var i=0;i<changed.length;i+=12)chunks.push(changed.slice(i,i+12));
   (function next(i){
     if(i>=chunks.length)return;
@@ -2616,22 +2703,24 @@ function castleApplyReorder(fn){
 }
 function castleAddPartyToGroup(gi){
   if(!IS_ADMIN)return;
-  if(castleApplyReorder(function(){return boardAddParty(CASTLE_LAYOUT,CASTLE.parties,gi);}))toast('เพิ่มปาตี้ในกลุ่ม '+letterFor(gi)+' แล้ว');
+  if(castleApplyReorder(function(){return boardAddParty(CASTLE_LAYOUT,CASTLE.parties,gi,CASTLE_LOCKS);}))toast('เพิ่มปาตี้ในกลุ่ม '+letterFor(gi)+' แล้ว');
 }
 function castleDeleteParty(pi){
   if(!IS_ADMIN)return;
   var row=CASTLE.parties[pi];if(!row)return;
+  if(isLockedC(pi)){toast('ปาตี้นี้ถูกล็อกโดย '+CASTLE_LOCKS[pi].by+' 🔒 ปลดล็อกก่อน');return;}
   var n=row.filter(Boolean).length;
   if(!confirm('ลบ Party '+(pi+1)+' ทั้งตี้?'+(n?(' ('+n+' คนในตี้จะกลับไปอยู่รายชื่อที่ยังไม่ได้จัด)'):'')))return;
   if(castleApplyReorder(function(){
     row.forEach(function(m){if(m){m.castle_party=-1;m.castle_slot=-1;}});
-    return boardRemoveParty(CASTLE_LAYOUT,CASTLE.parties,pi);
+    return boardRemoveParty(CASTLE_LAYOUT,CASTLE.parties,pi,CASTLE_LOCKS);
   }))toast('ลบปาตี้แล้ว');
 }
 function castleDropParty(tgi,beforePi){
   if(!IS_ADMIN||dragPartyIdx==null)return;
   var pi=dragPartyIdx;dragPartyIdx=null;
-  if(castleApplyReorder(function(){return boardMoveParty(CASTLE_LAYOUT,CASTLE.parties,pi,tgi,beforePi);}))toast('ย้ายปาตี้แล้ว');
+  if(isLockedC(pi)){toast('ปาตี้นี้ถูกล็อกอยู่ 🔒');return;}
+  if(castleApplyReorder(function(){return boardMoveParty(CASTLE_LAYOUT,CASTLE.parties,pi,tgi,beforePi,CASTLE_LOCKS);}))toast('ย้ายปาตี้แล้ว');
 }
 function castleCmp(a,b){return CASTLE.sortBy==="cp"||CASTLE.sortBy==="party"?b.cp-a.cp:CASTLE.sortBy==="name"?a.ign.localeCompare(b.ign):(a.cls||'').localeCompare(b.cls||'')||b.cp-a.cp;}
 function setCastleSort(s){CASTLE.sortBy=s;document.querySelectorAll('.chip[data-cs]').forEach(function(c){c.classList.toggle('on',c.dataset.cs===s);});renderCastlePool();}
@@ -2662,6 +2751,7 @@ function castleDropTo(pi,si){
   var m=castleMemberByIgn(castleDragId);castleDragId=null;
   if(!m)return;
   var P=CASTLE.parties;
+  if(isLockedC(pi)||(m.castle_party>=0&&isLockedC(m.castle_party))){toast('ปาตี้ถูกล็อกอยู่ 🔒 ปลดล็อกก่อนถึงจะแก้ได้');return;}
   if(m.castle_party>=0)P[m.castle_party][m.castle_slot]=null;
   var s=si;
   if(P[pi][s]){s=-1;for(var i=0;i<SLOTS;i++){if(!P[pi][i]){s=i;break;}}}
@@ -2676,6 +2766,7 @@ function castleTapPlace(pi,si){
 function castleRemove(ign){
   if(!IS_ADMIN)return;
   var m=castleMemberByIgn(ign);if(!m)return;
+  if(m.castle_party>=0&&isLockedC(m.castle_party)){toast('ปาตี้ถูกล็อกอยู่ 🔒');return;}
   if(m.castle_party>=0)CASTLE.parties[m.castle_party][m.castle_slot]=null;
   m.castle_party=-1;m.castle_slot=-1;
   renderCastleBoard();renderCastlePool();castlePersistOne(m);
@@ -2737,6 +2828,7 @@ function renderCastlePool(){
 }
 function castleClearAll(){
   if(!IS_ADMIN)return;
+  if(CASTLE_LOCKS.some(function(x){return x&&x.by;})){toast('มีปาตี้ที่ถูกล็อกอยู่ 🔒 ปลดล็อกทั้งหมดก่อนถึงจะล้างได้');return;}
   if(!confirm('ล้างปาตี้ทั้งหมด รวมถึงโครงสร้างกลุ่ม A/B/C.../ ของศึกชิงปราสาท? (บันทึกทันที ย้อนไม่ได้ ต้องกด "+ สร้างกลุ่มปาตี้" ใหม่)'))return;
   sb.from('members').update({castle_party:-1,castle_slot:-1}).eq('guild','PIGROCKS').then(function(r){
     if(r.error){toast("ล้างไม่ได้: "+r.error.message);return;}
